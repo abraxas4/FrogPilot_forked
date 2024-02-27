@@ -40,6 +40,7 @@ FrogPilotVisualsPanel::FrogPilotVisualsPanel(SettingsWindow *parent) : FrogPilot
 
     {"ModelUI", "Model UI", "Personalize how the model's visualizations appear on your screen.", "../assets/offroad/icon_calibration.png"},
     {"DynamicPathWidth", "Dynamic Path Width", "Have the path width dynamically adjust based on the current engagement state of openpilot.", ""},
+    {"HideLeadMarker", "Hide Lead Marker", "Hide the lead marker from the onroad UI.", ""},
     {"LaneLinesWidth", "Lane Lines", "Adjust the visual thickness of lane lines on your display.\n\nDefault matches the MUTCD average of 4 inches.", ""},
     {"PathEdgeWidth", "Path Edges", "Adjust the width of the path edges shown on your UI to represent different driving modes and statuses.\n\nDefault is 20% of the total path.\n\nBlue = Navigation\nLight Blue = Always On Lateral\nGreen = Default with 'FrogPilot Colors'\nLight Green = Default with stock colors\nOrange = Experimental Mode Active\nYellow = Conditional Overriden", ""},
     {"PathWidth", "Path Width", "Customize the width of the driving path shown on your UI.\n\nDefault matches the width of a 2019 Lexus ES 350.", ""},
@@ -56,6 +57,15 @@ FrogPilotVisualsPanel::FrogPilotVisualsPanel(SettingsWindow *parent) : FrogPilot
     {"WheelSpeed", "Use Wheel Speed", "Use the wheel speed metric as opposed to the artificial speed.", ""},
 
     {"RandomEvents", "Random Events", "Enjoy a bit of unpredictability with random events that can occur during certain driving conditions.", "../frogpilot/assets/toggle_icons/icon_random.png"},
+
+    {"ScreenManagement", "Screen Management", "Manage your screen's brightness, timeout settings, and hide specific onroad UI elements.", "../frogpilot/assets/toggle_icons/icon_light.png"},
+    {"HideUIElements", "Hide UI Elements", "Hide the selected UI elements from the onroad screen.", ""},
+    {"ScreenBrightness", "Screen Brightness", "Customize your screen brightness when offroad.", ""},
+    {"ScreenBrightnessOnroad", "Screen Brightness (Onroad)", "Customize your screen brightness when onroad.", ""},
+    {"ScreenRecorder", "Screen Recorder", "Enable the screen recorder button to record the screen.", ""},
+    {"ScreenTimeout", "Screen Timeout", "Customize how long it takes for your screen to turn off.", ""},
+    {"ScreenTimeoutOnroad", "Screen Timeout (Onroad)", "Customize how long it takes for your screen to turn off after going onroad.", ""},
+    {"StandbyMode", "Standby Mode", "Turn the screen off after your screen times out when onroad but wake it back up when engagement state changes or important alerts are triggered.", ""},
 
     {"WheelIcon", "Steering Wheel Icon", "Replace the default steering wheel icon with a custom design, adding a unique touch to your interface.", "../assets/offroad/icon_openpilot.png"},
   };
@@ -207,11 +217,33 @@ FrogPilotVisualsPanel::FrogPilotVisualsPanel(SettingsWindow *parent) : FrogPilot
 
       addItem(mapStyleButton);
 
+    } else if (param == "ScreenManagement") {
+      FrogPilotParamManageControl *screenToggle = new FrogPilotParamManageControl(param, title, desc, icon, this);
+      QObject::connect(screenToggle, &FrogPilotParamManageControl::manageButtonClicked, this, [this]() {
+        parentToggleClicked();
+        for (auto &[key, toggle] : toggles) {
+          toggle->setVisible(screenKeys.find(key.c_str()) != screenKeys.end());
+        }
+      });
+      toggle = screenToggle;
+    } else if (param == "HideUIElements") {
+      std::vector<QString> uiElementsToggles{"HideAlerts", "HideMapIcon", "HideMaxSpeed"};
+      std::vector<QString> uiElementsToggleNames{tr("Alerts"), tr("Max Map Icon"), tr("Max Speed")};
+      toggle = new FrogPilotParamToggleControl(param, title, desc, icon, uiElementsToggles, uiElementsToggleNames);
+    } else if (param == "ScreenBrightness" || param == "ScreenBrightnessOnroad") {
+      std::map<int, QString> brightnessLabels;
+      for (int i = 0; i <= 101; ++i) {
+        brightnessLabels[i] = i == 0 ? "Screen Off" : i == 101 ? "Auto" : QString::number(i) + "%";
+      }
+      toggle = new FrogPilotParamValueControl(param, title, desc, icon, 0, 101, brightnessLabels, this, false);
+    } else if (param == "ScreenTimeout" || param == "ScreenTimeoutOnroad") {
+      toggle = new FrogPilotParamValueControl(param, title, desc, icon, 5, 60, std::map<int, QString>(), this, false, " seconds");
+
     } else if (param == "WheelIcon") {
       std::vector<QString> wheelToggles{"RotatingWheel"};
       std::vector<QString> wheelToggleNames{tr("Rotating")};
-      std::map<int, QString> steeringWheelLabels = {{0, "Stock"}, {1, "Lexus"}, {2, "Toyota"}, {3, "Frog"}, {4, "Rocket"}, {5, "Hyundai"}, {6, "Stalin"}};
-      toggle = new FrogPilotParamValueToggleControl(param, title, desc, icon, 0, 6, steeringWheelLabels, this, true, "", 1, wheelToggles, wheelToggleNames);
+      std::map<int, QString> steeringWheelLabels = {{-1, "None"}, {0, "Stock"}, {1, "Lexus"}, {2, "Toyota"}, {3, "Frog"}, {4, "Rocket"}, {5, "Hyundai"}, {6, "Stalin"}};
+      toggle = new FrogPilotParamValueToggleControl(param, title, desc, icon, -1, 6, steeringWheelLabels, this, true, "", 1, wheelToggles, wheelToggleNames);
 
     } else {
       toggle = new ParamControl(param, title, desc, icon, this);
@@ -246,7 +278,7 @@ FrogPilotVisualsPanel::FrogPilotVisualsPanel(SettingsWindow *parent) : FrogPilot
     QObject::connect(toggles[key], &ToggleControl::toggleFlipped, [this, key]() {
       if (started || key == "DriveStats") {
         if (FrogPilotConfirmationDialog::toggle("Reboot required to take effect.", "Reboot Now", this)) {
-          Hardware::soft_reboot();
+          Hardware::reboot();
         }
       }
     });
@@ -333,7 +365,8 @@ void FrogPilotVisualsPanel::hideSubToggles() {
                       customOnroadUIKeys.find(key.c_str()) != customOnroadUIKeys.end() ||
                       customThemeKeys.find(key.c_str()) != customThemeKeys.end() ||
                       modelUIKeys.find(key.c_str()) != modelUIKeys.end() ||
-                      qolKeys.find(key.c_str()) != qolKeys.end();
+                      qolKeys.find(key.c_str()) != qolKeys.end() ||
+                      screenKeys.find(key.c_str()) != screenKeys.end();
     toggle->setVisible(!subToggles);
   }
 

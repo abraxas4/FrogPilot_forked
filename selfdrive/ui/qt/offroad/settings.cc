@@ -284,6 +284,93 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   });
   addItem(deleteStorageParamsBtn);
 
+  // Backup FrogPilot toggles
+  auto backupTogglesBtn = new ButtonControl(tr("Backup Toggles"), tr("BACKUP"),
+    tr("This button provides a swift and secure way to backup the current state of your toggles for future restorations."));
+  connect(backupTogglesBtn, &ButtonControl::clicked, [=]() {
+    QString nameSelection = InputDialog::getText(tr("Name your backup"), this, "", false, 1);
+    if (!nameSelection.isEmpty()) {
+      std::thread([=]() {
+        backupTogglesBtn->setValue("Backing up toggles...");
+
+        std::string basePath = "/data/toggle_backups/";
+        std::string fullBackupPath = basePath + nameSelection.toStdString() + "/";
+
+        std::ostringstream commandStream;
+        commandStream << "mkdir -p " << std::quoted(fullBackupPath)
+                      << " && rsync -av /data/params/d/ " << std::quoted(fullBackupPath);
+        std::string command = commandStream.str();
+
+        int result = std::system(command.c_str());
+        if (result == 0) {
+          std::cout << "Backup successful to " << fullBackupPath << std::endl;
+        } else {
+          std::cerr << "Backup failed with error code: " << result << std::endl;
+        }
+
+        backupTogglesBtn->setValue("");
+      }).detach();
+    }
+  });
+  addItem(backupTogglesBtn);
+
+  // Restore FrogPilot toggles
+  auto restoreTogglesBtn = new ButtonControl(tr("Restore Toggles From Backup"), tr("SELECT"));
+  connect(restoreTogglesBtn, &ButtonControl::clicked, [=]() {
+    QDir backupDir("/data/toggle_backups/");
+    QStringList backupNames = backupDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+
+    QString selection = MultiOptionDialog::getSelection(tr("Select a restore point"), backupNames, "", this);
+    if (!selection.isEmpty()) {
+      if (!ConfirmationDialog::confirm(tr("Are you sure you want to restore this toggle backup?"), tr("Restore"), this)) return;
+      std::thread([=]() {
+        restoreTogglesBtn->setValue("Restoring backup...");
+
+        std::string sourcePath = "/data/toggle_backups/" + selection.toStdString() + "/";
+        std::string targetPath = "/data/params/d/";
+
+        std::ostringstream commandStream;
+        commandStream << "rsync -av --delete " << std::quoted(sourcePath) << " " << std::quoted(targetPath);
+        std::string command = commandStream.str();
+
+        int result = std::system(command.c_str());
+
+        if (result == 0) {
+          std::cout << "Restore successful from " << sourcePath << " to " << targetPath << std::endl;
+          restoreTogglesBtn->setValue("");
+          Hardware::reboot();
+        } else {
+          std::cerr << "Restore failed with error code: " << result << std::endl;
+          restoreTogglesBtn->setValue("Restore failed...");
+        }
+      }).detach();
+    }
+  });
+  addItem(restoreTogglesBtn);
+
+  // Delete toggles button
+  auto deleteTogglesBtn = new ButtonControl(tr("Delete Toggle Backups"), tr("SELECT"));
+  connect(deleteTogglesBtn, &ButtonControl::clicked, [=]() {
+    QDir backupDir("/data/toggle_backups");
+    QStringList backupNames = backupDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+
+    QString selection = MultiOptionDialog::getSelection(tr("Select a backup to delete"), backupNames, "", this);
+    if (!selection.isEmpty()) {
+      if (!ConfirmationDialog::confirm(tr("Are you sure you want to delete this backup?"), tr("Delete"), this)) return;
+      std::thread([=]() {
+        deleteTogglesBtn->setValue("Deleting backup...");
+
+        QDir dirToDelete(backupDir.absoluteFilePath(selection));
+        if (!dirToDelete.removeRecursively()) {
+          deleteTogglesBtn->setValue(tr("Failed to delete backup."));
+        } else {
+          deleteTogglesBtn->setValue(tr("Successfully deleted backup."));
+        }
+      }).detach();
+    }
+  });
+  addItem(deleteTogglesBtn);
+
   // Backup FrogPilot button
   auto backupFrogPilotBtn = new ButtonControl(tr("Backup FrogPilot"), tr("BACKUP"),
     tr("This button provides a swift and secure way to backup the current state of FrogPilot for future restorations."));
@@ -370,6 +457,8 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
         QDir dirToDelete(backupDir.absoluteFilePath(selection));
         if (!dirToDelete.removeRecursively()) {
           deleteBackupBtn->setValue(tr("Failed to delete backup."));
+        } else {
+          deleteBackupBtn->setValue(tr("Successfully deleted backup."));
         }
       }).detach();
     }
@@ -399,7 +488,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     process.setWorkingDirectory("/data/openpilot/panda");
     process.start("/bin/sh", QStringList{"-c", "pkill -f boardd; PYTHONPATH=.. python -c \"from panda import Panda; Panda().flash()\""});
     process.waitForFinished();
-    Hardware::soft_reboot();
+    Hardware::reboot();
   });
   addItem(flashPandaBtn);
 

@@ -186,14 +186,13 @@ class Controls:
     self.previously_enabled = False
     self.random_event_triggered = False
     self.stopped_for_light_previously = False
-    self.vCruise69_alert_played = False
 
     self.drive_distance = 0
+    self.max_acceleration = 0
     self.previous_drive_distance = 0
     self.previous_lead_distance = 0
     self.previous_speed_limit = SpeedLimitController.desired_speed_limit
     self.random_event_timer = 0
-    self.speed_limit_changed_timer = 0
 
     ignore = self.sensor_packets + ['testJoystick']
     if SIMULATION:
@@ -591,6 +590,21 @@ class Controls:
       self.params_memory.put_float("FrogPilotKilometers", self.drive_distance / 1000)
       self.params_memory.put_float("FrogPilotMinutes", self.sm.frame * DT_CTRL / 60)
 
+    # Acceleration Random Event alerts
+    if self.random_events:
+      acceleration = CS.aEgo
+
+      if not CS.gasPressed:
+        self.max_acceleration = max(acceleration, self.max_acceleration)
+      else:
+        self.max_acceleration = 0
+
+      if self.max_acceleration >= 3.0 and acceleration < 1.5:
+        self.events.add(EventName.accel30)
+        self.params_memory.put_int("CurrentRandomEvent", 2)
+        self.random_event_triggered = True
+        self.max_acceleration = 0
+
     # Green light alert
     if self.green_light_alert:
       stopped_for_light = frogpilot_plan.redLight and CS.standstill
@@ -835,10 +849,10 @@ class Controls:
     # FrogPilot functions
     frogpilot_plan = self.sm['frogpilotPlan']
 
-    # Reset the Random Event flag
+    # Reset the Random Event flag after 5 seconds
     if self.random_event_triggered:
       self.random_event_timer += 1
-      if self.random_event_timer >= 500:
+      if self.random_event_timer * DT_CTRL >= 5:
         self.random_event_triggered = False
         self.random_event_timer = 0
         self.params_memory.remove("CurrentRandomEvent")
@@ -1189,6 +1203,7 @@ class Controls:
     self.holiday_themes = custom_theme and self.params.get_bool("HolidayThemes")
 
     experimental_mode_activation = self.params.get_bool("ExperimentalModeActivation")
+    self.frogpilot_variables.experimental_mode_via_distance = experimental_mode_activation and self.params.get_bool("ExperimentalModeViaDistance")
     self.frogpilot_variables.experimental_mode_via_lkas = experimental_mode_activation and self.params.get_bool("ExperimentalModeViaLKAS")
 
     lateral_tune = self.params.get_bool("LateralTune")
@@ -1202,6 +1217,7 @@ class Controls:
 
     longitudinal_tune = self.params.get_bool("LongitudinalTune")
     self.frogpilot_variables.sport_plus = longitudinal_tune and self.params.get_int("AccelerationProfile") == 3
+    self.frogpilot_variables.traffic_mode = longitudinal_tune and self.params.get_bool("TrafficMode")
 
     self.lane_detection = self.params.get_bool("LaneDetection") and self.params.get_bool("NudgelessLaneChange")
     self.lane_detection_width = self.params.get_int("LaneDetectionWidth") * (1 if self.is_metric else CV.FOOT_TO_METER) / 10 if self.lane_detection else 0

@@ -176,6 +176,7 @@ typedef struct UIScene {
 
   // FrogPilot variables
   bool acceleration_path;
+  bool active_alert;
   bool adjacent_path;
   bool adjacent_path_metrics;
   bool always_on_lateral;
@@ -195,6 +196,12 @@ typedef struct UIScene {
   bool fahrenheit;
   bool fps_counter;
   bool full_map;
+  bool hide_alerts;
+  bool hide_aol_status_bar;
+  bool hide_cem_status_bar;
+  bool hide_lead_marker;
+  bool hide_map_icon;
+  bool hide_max_speed;
   bool hide_speed;
   bool hide_speed_ui;
   bool holiday_themes;
@@ -211,14 +218,19 @@ typedef struct UIScene {
   bool right_hand_drive;
   bool road_name_ui;
   bool rotating_wheel;
+  bool screen_recorder;
   bool show_driver_camera;
   bool show_slc_offset;
   bool show_slc_offset_ui;
   bool speed_limit_changed;
   bool speed_limit_controller;
   bool speed_limit_overridden;
+  bool standby_mode;
   bool standstill;
+  bool status_changed;
   bool tethering_enabled;
+  bool traffic_mode;
+  bool traffic_mode_active;
   bool turn_signal_left;
   bool turn_signal_right;
   bool unlimited_road_ui_length;
@@ -254,6 +266,10 @@ typedef struct UIScene {
   int map_style;
   int obstacle_distance;
   int obstacle_distance_stock;
+  int screen_brightness;
+  int screen_brightness_onroad;
+  int screen_timeout;
+  int screen_timeout_onroad;
   int steering_angle_deg;
   int stopped_equivalence;
   int wheel_icon;
@@ -288,7 +304,10 @@ public:
 
   QTransform car_space_transform;
 
+  // FrogPilot variables
   WifiManager *wifi = nullptr;
+
+  UIStatus previous_status;
 
 signals:
   void uiUpdate(const UIState &s);
@@ -337,7 +356,7 @@ signals:
   void interactiveTimeout();
 
 public slots:
-  void resetInteractiveTimeout(int timeout = -1);
+  void resetInteractiveTimeout(int timeout = -1, int timeout_onroad = -1);
   void update(const UIState &s);
 };
 

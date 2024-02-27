@@ -39,11 +39,13 @@ private:
   FrogPilotDualParamControl *standardProfile;
   FrogPilotDualParamControl *relaxedProfile;
 
-  std::set<QString> conditionalExperimentalKeys = {"CECurves", "CECurvesLead", "CESlowerLead", "CENavigation", "CEStopLights", "CESignal"};
+  std::set<QString> aolKeys = {"AlwaysOnLateralMain", "HideAOLStatusBar"};
+  std::set<QString> conditionalExperimentalKeys = {"CECurves", "CECurvesLead", "CESlowerLead", "CENavigation", "CEStopLights", "CESignal", "HideCEMStatusBar"};
+  std::set<QString> experimentalModeActivationKeys = {"ExperimentalModeViaDistance", "ExperimentalModeViaLKAS", "ExperimentalModeViaScreen"};
   std::set<QString> fireTheBabysitterKeys = {"NoLogging", "MuteOverheated", "NoUploads", "OfflineMode"};
   std::set<QString> laneChangeKeys = {"LaneChangeTime", "LaneDetection", "LaneDetectionWidth", "OneLaneChange"};
   std::set<QString> lateralTuneKeys = {"ForceAutoTune", "NNFF", "SteerRatio", "UseLateralJerk"};
-  std::set<QString> longitudinalTuneKeys = {"AccelerationProfile", "DecelerationProfile", "AggressiveAcceleration", "SmoothBraking", "StoppingDistance"};
+  std::set<QString> longitudinalTuneKeys = {"AccelerationProfile", "DecelerationProfile", "AggressiveAcceleration", "SmoothBraking", "StoppingDistance", "TrafficMode"};
   std::set<QString> mtscKeys = {"DisableMTSCSmoothing", "MTSCAggressiveness", "MTSCCurvatureCheck", "MTSCLimit"};
   std::set<QString> qolKeys = {"DisableOnroadUploads", "HigherBitrate", "NavChill", "PauseLateralOnSignal", "ReverseCruise", "SetSpeedOffset"};
   std::set<QString> speedLimitControllerKeys = {"SLCControls", "SLCQOL", "SLCVisuals"};

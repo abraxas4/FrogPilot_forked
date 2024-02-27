@@ -259,6 +259,7 @@ def manager_init() -> None:
     ("StockTune", "0"),
     ("StoppingDistance", "0"),
     ("StorageParamsSet", "0"),
+    ("TrafficMode", "0"),
     ("TurnAggressiveness", "100"),
     ("TurnDesires", "0"),
     ("UnlimitedLength", "1"),
@@ -512,7 +513,7 @@ def main() -> None:
     HARDWARE.uninstall()
   elif params.get_bool("DoSoftReboot"):
     cloudlog.warning("softreboot")
-    HARDWARE.soft_reboot()
+    HARDWARE.reboot()
   elif params.get_bool("DoReboot"):
     cloudlog.warning("reboot")
     HARDWARE.reboot()

@@ -1093,6 +1093,14 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   },
 
   # Random Events
+  EventName.accel30: {
+    ET.WARNING: Alert(
+      "UwU u went a bit fast there!",
+      "(⁄ ⁄•⁄ω⁄•⁄ ⁄)",
+      AlertStatus.frogpilot, AlertSize.mid,
+      Priority.LOW, VisualAlert.none, AudibleAlert.uwu, 4.),
+  },
+
   EventName.firefoxSteerSaturated: {
     ET.WARNING: Alert(
       "Turn Exceeds Steering Limit",

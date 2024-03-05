@@ -2,6 +2,8 @@
 
 #include <cassert>
 #include <cmath>
+#include <iomanip>
+#include <iostream>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -267,6 +269,98 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     }).detach();
   });
   addItem(deleteStorageParamsBtn);
+
+  // Backup FrogPilot button
+  auto backupFrogPilotBtn = new ButtonControl(tr("Backup FrogPilot"), tr("BACKUP"),
+    tr("This button provides a swift and secure way to backup the current state of FrogPilot for future restorations."));
+  connect(backupFrogPilotBtn, &ButtonControl::clicked, [=]() {
+    QString nameSelection = InputDialog::getText(tr("Name your backup"), this, "", false, 1);
+    if (!nameSelection.isEmpty()) {
+      std::thread([=]() {
+        backupFrogPilotBtn->setValue("Backing up FrogPilot...");
+
+        std::string basePath = "/data/backups/";
+        std::string fullBackupPath = basePath + nameSelection.toStdString();
+
+        std::ostringstream commandStream;
+        commandStream << "mkdir -p " << std::quoted(fullBackupPath)
+                      << " && rsync -av /data/openpilot/ " << std::quoted(fullBackupPath + "/");
+        std::string command = commandStream.str();
+
+        int result = std::system(command.c_str());
+        if (result == 0) {
+          std::cout << "Backup successful to " << fullBackupPath << std::endl;
+        } else {
+          std::cerr << "Backup failed with error code: " << result << std::endl;
+        }
+
+        backupFrogPilotBtn->setValue("");
+      }).detach();
+    }
+  });
+  addItem(backupFrogPilotBtn);
+
+  // Restore FrogPilot button
+  auto restoreFrogPilotBtn = new ButtonControl(tr("Restore FrogPilot From Backup"), tr("SELECT"));
+  connect(restoreFrogPilotBtn, &ButtonControl::clicked, [=]() {
+    QDir backupDir("/data/backups");
+    QStringList backupNames = backupDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+
+    QString selection = MultiOptionDialog::getSelection(tr("Select a restore point"), backupNames, "", this);
+    if (!selection.isEmpty()) {
+      if (!ConfirmationDialog::confirm(tr("Are you sure you want to restore this version of FrogPilot?"), tr("Restore"), this)) return;
+      std::thread([=]() {
+        restoreFrogPilotBtn->setValue("Restoring backup...");
+
+        std::string sourcePath = "/data/backups/" + selection.toStdString();
+        std::string targetPath = "/data/safe_staging/finalized";
+        std::string consistentFilePath = targetPath + "/.overlay_consistent";
+
+        std::ostringstream commandStream;
+        commandStream << "rsync -av --delete --exclude='.overlay_consistent' " << std::quoted(sourcePath + "/") << " " << std::quoted(targetPath + "/");
+        std::string command = commandStream.str();
+        int result = std::system(command.c_str());
+
+        if (result == 0) {
+          std::cout << "Restore successful from " << sourcePath << " to " << targetPath << std::endl;
+          std::ofstream consistentFile(consistentFilePath);
+          if (consistentFile) {
+            consistentFile.close();
+            std::cout << ".overlay_consistent file created successfully." << std::endl;
+          } else {
+            std::cerr << "Failed to create .overlay_consistent file." << std::endl;
+          }
+          restoreFrogPilotBtn->setValue("");
+          Hardware::reboot();
+        } else {
+          std::cerr << "Restore failed with error code: " << result << std::endl;
+          restoreFrogPilotBtn->setValue("Restore failed...");
+        }
+      }).detach();
+    }
+  });
+  addItem(restoreFrogPilotBtn);
+
+  // Delete backup button
+  auto deleteBackupBtn = new ButtonControl(tr("Delete FrogPilot Backups"), tr("SELECT"));
+  connect(deleteBackupBtn, &ButtonControl::clicked, [=]() {
+    QDir backupDir("/data/backups");
+    QStringList backupNames = backupDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+
+    QString selection = MultiOptionDialog::getSelection(tr("Select a backup to delete"), backupNames, "", this);
+    if (!selection.isEmpty()) {
+      if (!ConfirmationDialog::confirm(tr("Are you sure you want to delete this backup?"), tr("Delete"), this)) return;
+      std::thread([=]() {
+        deleteBackupBtn->setValue("Deleting backup...");
+
+        QDir dirToDelete(backupDir.absoluteFilePath(selection));
+        if (!dirToDelete.removeRecursively()) {
+          deleteBackupBtn->setValue(tr("Failed to delete backup."));
+        }
+      }).detach();
+    }
+  });
+  addItem(deleteBackupBtn);
 
   QObject::connect(uiState(), &UIState::offroadTransition, [=](bool offroad) {
     for (auto btn : findChildren<ButtonControl *>()) {

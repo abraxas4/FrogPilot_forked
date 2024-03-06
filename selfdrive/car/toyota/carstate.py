@@ -182,11 +182,10 @@ class CarState(CarStateBase):
     if self.CP.carFingerprint != CAR.PRIUS_V:
       self.lkas_hud = copy.copy(cp_cam.vl["LKAS_HUD"])
 
-    # if openpilot does not control longitudinal and we are running on a TSS-P car, it is assumed that
-    # 0x343 will be present on the ADAS Bus. PCM wants to resume when:
+    # if openpilot does not control longitudinal, in this case, assume 0x343 is on bus0
     # 1) the car is no longer sending standstill
     # 2) the car is still in standstill
-    if not self.CP.openpilotLongitudinalControl and self.CP.carFingerprint not in (TSS2_CAR, UNSUPPORTED_DSU_CAR):
+    if not self.CP.openpilotLongitudinalControl:
       self.stock_resume_ready = cp.vl["ACC_CONTROL"]["RELEASE_STANDSTILL"] == 1
 
     # FrogPilot functions
@@ -340,7 +339,7 @@ class CarState(CarStateBase):
     if CP.enableBsm:
       messages.append(("BSM", 1))
 
-    if CP.carFingerprint in RADAR_ACC_CAR and not CP.flags & ToyotaFlags.DISABLE_RADAR.value:
+    if not CP.openpilotLongitudinalControl or (CP.carFingerprint in RADAR_ACC_CAR and not CP.flags & ToyotaFlags.DISABLE_RADAR.value):
       if not CP.flags & ToyotaFlags.SMART_DSU.value:
         messages += [
           ("ACC_CONTROL", 33),

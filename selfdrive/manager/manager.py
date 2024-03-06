@@ -409,11 +409,11 @@ def manager_thread() -> None:
         params_memory.remove(key)
 
         # Only count the drive if it lasted longer than 5 minutes
-        if key == "FrogPilotMinutes" and value_to_add >= 5:
-          new_frogpilot_drives = params.get_int("FrogPilotDrives") + 1
+        #if key == "FrogPilotMinutes" and value_to_add >= 5:
+          #new_frogpilot_drives = params.get_int("FrogPilotDrives") + 1
 
-          params.put_int("FrogPilotDrives", new_frogpilot_drives)
-          params_storage.put_int("FrogPilotDrives", new_frogpilot_drives)
+          #params.put_int("FrogPilotDrives", new_frogpilot_drives)
+          #params_storage.put_int("FrogPilotDrives", new_frogpilot_drives)
 
     # update onroad params, which drives boardd's safety setter thread
     if started != started_prev:

@@ -177,9 +177,11 @@ class Controls:
     # FrogPilot variables
     self.params = Params()
     self.params_memory = Params("/dev/shm/params")
+    self.params_storage = Params("/persist/comma/params")
 
     self.frogpilot_variables = SimpleNamespace()
 
+    self.drive_added = False
     self.driving_gear = False
     self.fcw_random_event_triggered = False
     self.openpilot_crashed = False
@@ -589,6 +591,27 @@ class Controls:
     if self.drive_distance != self.previous_drive_distance:
       self.params_memory.put_float("FrogPilotKilometers", self.drive_distance / 1000)
       self.params_memory.put_float("FrogPilotMinutes", self.sm.frame * DT_CTRL / 60)
+
+    # Temporary band-aid fix for comma powerless users - TODO Look into removing this when comma removes the comma power
+    if self.sm.frame * DT_CTRL % 60 == 0:
+      keys = ["FrogPilotKilometers", "FrogPilotMinutes"]
+      for key in keys:
+        current_value = self.params.get_float(key)
+        value_to_add = self.params_memory.get_float(key)
+        new_value = current_value + value_to_add
+
+        self.params.put_float(key, new_value)
+        self.params_storage.put_float(key, new_value)
+        self.params_memory.remove(key)
+
+        # Only count the drive if we haven't counted this drive yet
+        if not self.drive_added and self.sm.frame >= 30000 / DT_CTRL:
+          new_frogpilot_drives = self.params.get_int("FrogPilotDrives") + 1
+
+          self.params.put_int("FrogPilotDrives", new_frogpilot_drives)
+          self.params_storage.put_int("FrogPilotDrives", new_frogpilot_drives)
+
+          self.drive_added = True
 
     # Acceleration Random Event alerts
     if self.random_events:

@@ -479,6 +479,7 @@ void ExperimentalButton::paintEvent(QPaintEvent *event) {
     (scene.always_on_lateral_active ? QColor(10, 186, 181, 255) :
     (scene.conditional_status == 1 ? QColor(255, 246, 0, 255) :
     (experimental_mode ? QColor(218, 111, 37, 241) :
+    (scene.traffic_mode_active ? QColor(255, 0, 0, 255) :
     (scene.navigate_on_openpilot ? QColor(49, 161, 238, 255) : QColor(0, 0, 0, 166)))))) :
     QColor(0, 0, 0, 166);
 
@@ -645,6 +646,8 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
       ), 6));
     } else if (scene.reverse_cruise) {
       p.setPen(QPen(QColor(0, 150, 255), 6));
+    } else if (scene.traffic_mode_active) {
+      p.setPen(QPen(QColor(255, 0, 0), 6));
     } else {
       p.setPen(QPen(whiteColor(75), 6));
     }
@@ -727,13 +730,14 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
       }
       p.restore();
     }
-    p.restore();
   }
 
   // current speed
   if (!(scene.hide_speed || fullMapOpen)) {
+    p.save();
     p.setFont(InterFont(176, QFont::Bold));
     drawText(p, rect().center().x(), 210, speedStr);
+    p.restore();
     p.setFont(InterFont(66));
     drawText(p, rect().center().x(), 290, speedUnit, 200);
   }
@@ -893,6 +897,10 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
     pe.setColorAt(0.0, QColor::fromHslF(25 / 360., 0.71, 0.50, 1.0));
     pe.setColorAt(0.5, QColor::fromHslF(25 / 360., 0.71, 0.50, 0.5));
     pe.setColorAt(1.0, QColor::fromHslF(25 / 360., 0.71, 0.50, 0.1));
+  } else if (scene.traffic_mode_active) {
+    pe.setColorAt(0.0, QColor::fromHslF(0 / 360., 1.0, 0.50, 1.0));
+    pe.setColorAt(0.5, QColor::fromHslF(0 / 360., 1.0, 0.50, 0.5));
+    pe.setColorAt(1.0, QColor::fromHslF(0 / 360., 1.0, 0.50, 0.1));
   } else if (scene.navigate_on_openpilot) {
     pe.setColorAt(0.0, QColor::fromHslF(205 / 360., 0.85, 0.56, 1.0));
     pe.setColorAt(0.5, QColor::fromHslF(205 / 360., 0.85, 0.56, 0.5));

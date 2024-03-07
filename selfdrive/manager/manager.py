@@ -259,6 +259,7 @@ def manager_init() -> None:
     ("StockTune", "0"),
     ("StoppingDistance", "0"),
     ("StorageParamsSet", "0"),
+    ("TrafficMode", "0"),
     ("TurnAggressiveness", "100"),
     ("TurnDesires", "0"),
     ("UnlimitedLength", "1"),

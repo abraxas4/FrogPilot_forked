@@ -1565,25 +1565,53 @@ void PedalIcons::updateState() {
   }
 }
 
+// MJ
+// Paint event handler for PedalIcons. This is called by the Qt framework to draw the pedal icons.
 void PedalIcons::paintEvent(QPaintEvent *event) {
+  // QPainter is used for all drawing operations
   QPainter p(this);
+  // Set antialiasing to true for smoother drawing
   p.setRenderHint(QPainter::Antialiasing);
 
-  int totalWidth = 2 * img_size;
+  // Increase the img_size by 50%
+  int newSize = img_size * 1.5;
+
+  // Calculate the total width needed to draw both pedal icons side by side
+  int totalWidth = 2 * newSize;
+  // Calculate the starting X coordinate to center the icons within the widget
   int startX = (width() - totalWidth) / 2;
 
-  int brakeX = startX + img_size / 2;
-  int gasX = startX + img_size;
+  // Calculate X coordinate for the brake pedal icon, centering it within its half of the area
+  int brakeX = startX + newSize / 2;
+  // Calculate X coordinate for the gas pedal icon, placing it next to the brake
+  int gasX = startX + newSize;
 
-  float brakeOpacity = scene.standstill ? 1.0f : decelerating ? std::max(0.25f, std::abs(acceleration)) : 0.25f;
-  float gasOpacity = accelerating ? std::max(0.25f, acceleration) : 0.25f;
+  // To make the opacity more noticeable, increase the minimum opacity to a higher value,
+  // and adjust the scaling factor to increase the visibility of changes in acceleration.
+  // Here we change the minimum opacity to 0.5 and scale the dynamic part accordingly.
+  float minOpacity = 0.5f;
+  float maxOpacity = 1.0f;
+  float dynamicRange = maxOpacity - minOpacity; // Dynamic range for opacity changes.
 
+  // Adjust the opacity calculation:
+  // - Full opacity (1.0) when the car is at a standstill or when the acceleration changes are significant.
+  // - A more noticeable minimum opacity when there is no significant change in acceleration.
+  float brakeOpacity = scene.standstill ? maxOpacity : decelerating ? minOpacity + dynamicRange * std::min(std::abs(acceleration) / 0.25f, 1.0f) : minOpacity;
+  float gasOpacity = accelerating ? minOpacity + dynamicRange * std::min(acceleration / 0.25f, 1.0f) : minOpacity;
+
+
+  // Set the painter's opacity before drawing the brake pedal
   p.setOpacity(brakeOpacity);
-  p.drawPixmap(brakeX, (height() - img_size) / 2, brake_pedal_img);
+  // Draw the brake pedal icon at its calculated position
+  p.drawPixmap(brakeX, (height() - newSize) / 2, brake_pedal_img);
 
+  // Set the painter's opacity before drawing the gas pedal
   p.setOpacity(gasOpacity);
-  p.drawPixmap(gasX, (height() - img_size) / 2, gas_pedal_img);
+  // Draw the gas pedal icon at its calculated position
+  p.drawPixmap(gasX, (height() - newSize) / 2, gas_pedal_img);
 }
+
+
 
 void AnnotatedCameraWidget::drawSLCConfirmation(QPainter &p) {
   p.save();

@@ -152,55 +152,59 @@ public:
   explicit AnnotatedCameraWidget(VisionStreamType type, QWidget* parent = 0);
   void updateState(const UIState &s);
 
+  // Buttons to toggle map settings
   MapSettingsButton *map_settings_btn;
   MapSettingsButton *map_settings_btn_bottom;
 
 private:
+  // Helper function to draw text on the UI at specified location and opacity
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
 
-  QVBoxLayout *main_layout;
-  ExperimentalButton *experimental_btn;
-  QPixmap dm_img;
-  float speed;
-  QString speedUnit;
-  float setSpeed;
-  float speedLimit;
-  bool is_cruise_set = false;
-  bool is_metric = false;
-  bool dmActive = false;
-  bool hideBottomIcons = false;
-  bool rightHandDM = false;
-  float dm_fade_state = 1.0;
-  bool has_us_speed_limit = false;
-  bool has_eu_speed_limit = false;
-  bool v_ego_cluster_seen = false;
-  int status = STATUS_DISENGAGED;
-  std::unique_ptr<PubMaster> pm;
+  QVBoxLayout *main_layout; // Main layout for UI elements
+  ExperimentalButton *experimental_btn; // Button for experimental features
+  QPixmap dm_img; // Pixmap for driver monitoring image
+  float speed; // Current vehicle speed
+  QString speedUnit; // Unit of the speed (e.g., km/h or mph)
+  float setSpeed; // Speed set by cruise control
+  float speedLimit; // Speed limit detected or set by the system
+  bool is_cruise_set = false; // Flag to indicate if cruise control is set
+  bool is_metric = false; // Flag for metric system usage for units
+  bool dmActive = false; // Flag for driver monitoring system activity
+  bool hideBottomIcons = false; // Flag to hide or show bottom icons
+  bool rightHandDM = false; // Flag for right-hand drive configurations for DM
+  float dm_fade_state = 1.0; // Opacity state for driver monitoring fade effect
+  bool has_us_speed_limit = false; // Flag for US speed limit detection
+  bool has_eu_speed_limit = false; // Flag for EU speed limit detection
+  bool v_ego_cluster_seen = false; // Flag indicating if ego vehicle's speed is shown in cluster
+  int status = STATUS_DISENGAGED; // Current status of the driving session
+  std::unique_ptr<PubMaster> pm; // Publisher for interprocess communication
 
-  int skip_frame_count = 0;
-  bool wide_cam_requested = false;
+  int skip_frame_count = 0; // Counter for skipped frames
+  bool wide_cam_requested = false; // Flag to indicate if wide camera view is requested
 
-  // FrogPilot widgets
+  // FrogPilot-specific UI initialization and update functions
   void initializeFrogPilotWidgets();
   void updateFrogPilotWidgets(QPainter &p);
 
+  // Functions to draw lead car info, SLC confirmation, status bar, and turn signals
   void drawLeadInfo(QPainter &p);
   void drawSLCConfirmation(QPainter &p);
   void drawStatusBar(QPainter &p);
   void drawTurnSignals(QPainter &p);
 
-  // FrogPilot variables
-  Params paramsMemory{"/dev/shm/params"};
+  // FrogPilot variables and additional UI elements
+  Params paramsMemory{"/dev/shm/params"}; // In-memory storage for parameters
 
-  UIScene &scene;
+  UIScene &scene; // Reference to the scene containing vehicle and environment data
 
-  Compass *compass_img;
-  PedalIcons *pedal_icons;
-  PersonalityButton *personality_btn;
-  ScreenRecorder *recorder_btn;
+  Compass *compass_img; // Compass widget
+  PedalIcons *pedal_icons; // Pedal icon widgets
+  PersonalityButton *personality_btn; // Button to toggle driving personality
+  ScreenRecorder *recorder_btn; // Button to control screen recording
 
-  QHBoxLayout *bottom_layout;
+  QHBoxLayout *bottom_layout; // Layout for bottom-aligned UI elements
 
+  // Flags and settings for various FrogPilot features and UI customizations
   bool alwaysOnLateral;
   bool alwaysOnLateralActive;
   bool blindSpotLeft;
@@ -223,7 +227,7 @@ private:
   bool turnSignalRight;
   bool useViennaSLCSign;
   bool vtscControllingCurve;
-
+  // Variables for holding configuration and dynamic values for the UI elements
   float cruiseAdjustment;
   float distanceConversion;
   float laneWidthLeft;
@@ -241,35 +245,45 @@ private:
   int obstacleDistance;
   int obstacleDistanceStock;
   int totalFrames = 8;
-
+  // Variables for storing units and labels for UI elements
   QString leadDistanceUnit;
   QString leadSpeedUnit;
 
-  size_t animationFrameIndex;
+  size_t animationFrameIndex; // Index for the current frame in an animation sequence
 
+  // Configuration for theming and UI colors
   std::unordered_map<int, std::tuple<QString, int, QColor, std::map<double, QBrush>>> themeConfiguration;
-  std::vector<QPixmap> signalImgVector;
+  std::vector<QPixmap> signalImgVector; // Vector of images for turn signals
 
-  QTimer *animationTimer;
+  QTimer *animationTimer; // Timer to handle UI animations
 
+  // Inline functions to return QColor objects for different UI elements
   inline QColor greenColor(int alpha = 242) { return QColor(23, 134, 68, alpha); }
 
 protected:
+  // Overridden OpenGL functions for initializing and painting the OpenGL context
   void paintGL() override;
   void initializeGL() override;
-  void showEvent(QShowEvent *event) override;
-  void updateFrameMat() override;
-  void drawLaneLines(QPainter &painter, const UIState *s);
-  void drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd);
-  void drawHud(QPainter &p);
-  void drawDriverState(QPainter &painter, const UIState *s);
-  void paintEvent(QPaintEvent *event) override;
-  inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); }
-  inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }
-  inline QColor blackColor(int alpha = 255) { return QColor(0, 0, 0, alpha); }
 
-  double prev_draw_t = 0;
-  FirstOrderFilter fps_filter;
+  // Event handlers and UI update functions
+  void showEvent(QShowEvent *event) override; // Called when the widget is shown; can be used to initialize certain UI elements or states.
+  void updateFrameMat() override; // Called to update the frame matrix for the camera view, possibly recalculating the projection if necessary.
+
+  // Drawing functions for various UI components related to driving visualization
+  void drawLaneLines(QPainter &painter, const UIState *s); // Draws lane lines on the UI based on the current state.
+  void drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd); // Draws the lead vehicle information, including distance and speed.
+  void drawHud(QPainter &p); // Draws the heads-up display (HUD) elements such as speed, speed limit, etc.
+  void drawDriverState(QPainter &painter, const UIState *s); // Draws visual elements related to driver monitoring state.
+  
+  void paintEvent(QPaintEvent *event) override; // Overrides the QWidget paint event to handle custom painting of the UI elements.
+
+  // Utility inline functions for commonly used colors within the UI.
+  inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); } // Returns a red color with the specified opacity.
+  inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); } // Returns a white color with the specified opacity.
+  inline QColor blackColor(int alpha = 255) { return QColor(0, 0, 0, alpha); } // Returns a black color with the specified opacity.
+
+  double prev_draw_t = 0; // Holds the previous draw time; useful for calculating frame rates or animation intervals.
+  FirstOrderFilter fps_filter; // A filter for smoothing out the frame-per-second calculations.
 };
 
 // container for all onroad widgets

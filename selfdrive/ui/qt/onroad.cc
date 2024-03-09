@@ -261,10 +261,17 @@ void OnroadWindow::paintEvent(QPaintEvent *event) {
     p.setRenderHint(QPainter::TextAntialiasing);
     p.setPen(Qt::white);
 
-    // Center the text
     QRect currentRect = rect();
-    int textWidth = p.fontMetrics().horizontalAdvance(fpsDisplayString);
+    // Left aligned
+    #if true
+    // Define the desired left margin
+    int leftMargin = 10; // You can adjust this value to whatever margin you want
+    int xPos = leftMargin;
+    #else
+    // Center the text
+    int textWidth = p.fontMetrics().horizontalAdvance(fpsDisplayString);    
     int xPos = (currentRect.width() - textWidth) / 2;
+    #endif
     int yPos = currentRect.bottom() - 5;
 
     // Draw the text

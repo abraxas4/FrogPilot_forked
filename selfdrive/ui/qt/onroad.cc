@@ -1596,7 +1596,7 @@ void PedalIcons::paintEvent(QPaintEvent *event) {
   // Adjust the opacity calculation:
   // - Full opacity (1.0) when the car is at a standstill or when the acceleration changes are significant.
   // - A more noticeable minimum opacity when there is no significant change in acceleration.
-  float brakeOpacity = scene.standstill ? maxOpacity : decelerating ? minOpacity + dynamicRange * std::min(std::abs(acceleration) / 0.25f, 1.0f) : minOpacity;
+  float brakeOpacity = scene.standstill ? maxOpacity : decelerating ? minOpacity + dynamicRange * std::min(std::abs(acceleration) / 0.60f, 1.0f) : minOpacity;
   float gasOpacity = accelerating ? minOpacity + dynamicRange * std::min(acceleration / 0.25f, 1.0f) : minOpacity;
 
 

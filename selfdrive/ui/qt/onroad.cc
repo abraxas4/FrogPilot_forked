@@ -314,10 +314,13 @@ void OnroadAlerts::updateAlert(const Alert &a) {
   }
 }
 
+// OnroadAlerts
 void OnroadAlerts::paintEvent(QPaintEvent *event) {
   if (alert.size == cereal::ControlsState::AlertSize::NONE || scene.show_driver_camera) {
-    return;
+    return; // Do not draw the alert if the size is NONE or if the driver camera is shown.
   }
+  
+  // Define the height of the alert based on the alert size.
   static std::map<cereal::ControlsState::AlertSize, const int> alert_heights = {
     {cereal::ControlsState::AlertSize::SMALL, 271},
     {cereal::ControlsState::AlertSize::MID, 420},
@@ -325,6 +328,7 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
   };
   int h = alert_heights[alert.size];
 
+  // Define margins and radius for the alert box.
   int margin = 40;
   int radius = 30;
   int offset = scene.always_on_lateral || scene.conditional_experimental || scene.road_name_ui ? 25 : 0;
@@ -333,29 +337,24 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
     radius = 0;
     offset = 0;
   }
-  QRect r = QRect(0 + margin, height() - h + margin - offset, width() - margin*2, h - margin*2);
+
+  // Define the rectangle in which the alert will be drawn.
+  QRect r = QRect(0 + margin, height() - h + margin - offset, width() - margin * 2, h - margin * 2);
 
   QPainter p(this);
 
-  // draw background + gradient
+  // Set the background color to semi-transparent yellow (50% opacity) and no border.
   p.setPen(Qt::NoPen);
-  p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-  p.setBrush(QBrush(alert_colors[alert.status]));
-  p.drawRoundedRect(r, radius, radius);
+  QColor semiTransparentYellow(0xff, 0xff, 0x00, 127); // Yellow with 50% opacity.
+  p.setBrush(semiTransparentYellow);
+  p.drawRoundedRect(r, radius, radius); // Draw the rounded rectangle with the yellow background.
 
-  QLinearGradient g(0, r.y(), 0, r.bottom());
-  g.setColorAt(0, QColor::fromRgbF(0, 0, 0, 0.05));
-  g.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0.35));
-
-  p.setCompositionMode(QPainter::CompositionMode_DestinationOver);
-  p.setBrush(QBrush(g));
-  p.drawRoundedRect(r, radius, radius);
-  p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-
-  // text
+  // Set up the text to be drawn.
   const QPoint c = r.center();
-  p.setPen(QColor(0xff, 0xff, 0xff));
+  p.setPen(QColor(0x00, 0x00, 0x00)); // Set the pen to black for the text color.
   p.setRenderHint(QPainter::TextAntialiasing);
+
+  // Draw the text based on the size of the alert.
   if (alert.size == cereal::ControlsState::AlertSize::SMALL) {
     p.setFont(InterFont(74, QFont::DemiBold));
     p.drawText(r, Qt::AlignCenter, alert.text1);

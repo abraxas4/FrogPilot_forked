@@ -248,13 +248,25 @@ void OnroadWindow::paintEvent(QPaintEvent *event) {
   if (scene.fps_counter) {
     updateFPSCounter();
 
-    // Format the FPS string
-    QString fpsDisplayString = QString("FPS: %1 (%2) | Min: %3 | Max: %4 | Avg: %5")
-      .arg(fps, 0, 'f', 2)
-      .arg(paramsMemory.getInt("CameraFPS"))
-      .arg(minFPS, 0, 'f', 2)
-      .arg(maxFPS, 0, 'f', 2)
-      .arg(avgFPS, 0, 'f', 2);
+    const SubMaster &sm = *(uiState()->sm);
+    const auto car_state = sm["carState"].getCarState();
+
+    // getTpms(), getFl, ... are to be auto-generated to cereal/gen/cpp/car.capnp.h
+    float tpms_fl = car_state.getTpms().getFl();
+    float tpms_fr = car_state.getTpms().getFr();
+    float tpms_rl = car_state.getTpms().getRl();
+    float tpms_rr = car_state.getTpms().getRr();
+
+    QString fpsDisplayString = QString("TPMS FL:%1 FR:%2 RL:%3 RR:%4 | FPS: %5 (%6) | Min: %7 | Max: %8 | Avg: %9")
+        .arg(tpms_fl, 0, 'f', 2) // Tire pressure for front left tire
+        .arg(tpms_fr, 0, 'f', 2) // Tire pressure for front right tire
+        .arg(tpms_rl, 0, 'f', 2) // Tire pressure for rear left tire
+        .arg(tpms_rr, 0, 'f', 2) // Tire pressure for rear right tire
+        .arg(fps, 0, 'f', 2)
+        .arg(paramsMemory.getInt("CameraFPS"))
+        .arg(minFPS, 0, 'f', 2)
+        .arg(maxFPS, 0, 'f', 2)
+        .arg(avgFPS, 0, 'f', 2);
 
     // Configure the text
     p.setFont(InterFont(30, QFont::DemiBold));

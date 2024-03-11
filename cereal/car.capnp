@@ -236,6 +236,21 @@ struct CarState {
   fuelGauge @41 :Float32; # battery or fuel tank level from 0.0 to 1.0
   charging @43 :Bool;
 
+  # neokii
+  vCluRatio @48 :Float32;
+  autoHold @49 :Int8;
+  tpms @50 :Tpms;
+  navSpeedLimit @51 :Int16;
+  aReqValue @52 :Float32;
+
+  struct Tpms {
+    enabled @0 :Bool;
+    fl @1 :Float32;
+    fr @2 :Float32;
+    rl @3 :Float32;
+    rr @4 :Float32;
+  }
+
   struct WheelSpeeds {
     # optional wheel speeds
     fl @0 :Float32;

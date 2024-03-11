@@ -251,13 +251,13 @@ void OnroadWindow::paintEvent(QPaintEvent *event) {
     const SubMaster &sm = *(uiState()->sm);
     const auto car_state = sm["carState"].getCarState();
 
-    // getTpms(), getFl, ... are to be auto-generated to cereal/gen/cpp/car.capnp.h
+    // getTpms(), getFl(), ... are auto-generated in cereal/gen/cpp/car.capnp.h
     float tpms_fl = car_state.getTpms().getFl();
     float tpms_fr = car_state.getTpms().getFr();
     float tpms_rl = car_state.getTpms().getRl();
     float tpms_rr = car_state.getTpms().getRr();
 
-    QString fpsDisplayString = QString("TPMS FL:%1 FR:%2 RL:%3 RR:%4 | FPS: %5 (%6) | Min: %7 | Max: %8 | Avg: %9")
+    QString fpsDisplayString = QString("TPMS: F(%1:$2) R(%3:%4) | FPS: %5 (%6) | Min: %7 | Max: %8 | Avg: %9")
         .arg(tpms_fl, 0, 'f', 2) // Tire pressure for front left tire
         .arg(tpms_fr, 0, 'f', 2) // Tire pressure for front right tire
         .arg(tpms_rl, 0, 'f', 2) // Tire pressure for rear left tire

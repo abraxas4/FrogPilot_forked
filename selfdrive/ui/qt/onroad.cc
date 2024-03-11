@@ -248,23 +248,42 @@ void OnroadWindow::paintEvent(QPaintEvent *event) {
   if (scene.fps_counter) {
     updateFPSCounter();
 
-    // Format the FPS string
-    QString fpsDisplayString = QString("FPS: %1 (%2) | Min: %3 | Max: %4 | Avg: %5")
-      .arg(fps, 0, 'f', 2)
-      .arg(paramsMemory.getInt("CameraFPS"))
-      .arg(minFPS, 0, 'f', 2)
-      .arg(maxFPS, 0, 'f', 2)
-      .arg(avgFPS, 0, 'f', 2);
+    const SubMaster &sm = *(uiState()->sm);
+    const auto car_state = sm["carState"].getCarState();
+
+    // getTpms(), getFl, ... are to be auto-generated to cereal/gen/cpp/car.capnp.h
+    float tpms_fl = car_state.getTpms().getFl();
+    float tpms_fr = car_state.getTpms().getFr();
+    float tpms_rl = car_state.getTpms().getRl();
+    float tpms_rr = car_state.getTpms().getRr();
+
+    QString fpsDisplayString = QString("TPMS FL:%1 FR:%2 RL:%3 RR:%4 | FPS: %5 (%6) | Min: %7 | Max: %8 | Avg: %9")
+        .arg(tpms_fl, 0, 'f', 2) // Tire pressure for front left tire
+        .arg(tpms_fr, 0, 'f', 2) // Tire pressure for front right tire
+        .arg(tpms_rl, 0, 'f', 2) // Tire pressure for rear left tire
+        .arg(tpms_rr, 0, 'f', 2) // Tire pressure for rear right tire
+        .arg(fps, 0, 'f', 2)
+        .arg(paramsMemory.getInt("CameraFPS"))
+        .arg(minFPS, 0, 'f', 2)
+        .arg(maxFPS, 0, 'f', 2)
+        .arg(avgFPS, 0, 'f', 2);
 
     // Configure the text
     p.setFont(InterFont(30, QFont::DemiBold));
     p.setRenderHint(QPainter::TextAntialiasing);
     p.setPen(Qt::white);
 
-    // Center the text
     QRect currentRect = rect();
-    int textWidth = p.fontMetrics().horizontalAdvance(fpsDisplayString);
+    // Left aligned
+    #if true
+    // Define the desired left margin
+    int leftMargin = 10; // You can adjust this value to whatever margin you want
+    int xPos = leftMargin;
+    #else
+    // Center the text
+    int textWidth = p.fontMetrics().horizontalAdvance(fpsDisplayString);    
     int xPos = (currentRect.width() - textWidth) / 2;
+    #endif
     int yPos = currentRect.bottom() - 5;
 
     // Draw the text
@@ -307,10 +326,13 @@ void OnroadAlerts::updateAlert(const Alert &a) {
   }
 }
 
+// OnroadAlerts
 void OnroadAlerts::paintEvent(QPaintEvent *event) {
   if (alert.size == cereal::ControlsState::AlertSize::NONE || scene.show_driver_camera) {
-    return;
+    return; // Do not draw the alert if the size is NONE or if the driver camera is shown.
   }
+  
+  // Define the height of the alert based on the alert size.
   static std::map<cereal::ControlsState::AlertSize, const int> alert_heights = {
     {cereal::ControlsState::AlertSize::SMALL, 271},
     {cereal::ControlsState::AlertSize::MID, 420},
@@ -318,6 +340,7 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
   };
   int h = alert_heights[alert.size];
 
+  // Define margins and radius for the alert box.
   int margin = 40;
   int radius = 30;
   int offset = scene.always_on_lateral || scene.conditional_experimental || scene.road_name_ui ? 25 : 0;
@@ -326,29 +349,24 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
     radius = 0;
     offset = 0;
   }
-  QRect r = QRect(0 + margin, height() - h + margin - offset, width() - margin*2, h - margin*2);
+
+  // Define the rectangle in which the alert will be drawn.
+  QRect r = QRect(0 + margin, height() - h + margin - offset, width() - margin * 2, h - margin * 2);
 
   QPainter p(this);
 
-  // draw background + gradient
+  // Set the background color to semi-transparent yellow (50% opacity) and no border.
   p.setPen(Qt::NoPen);
-  p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-  p.setBrush(QBrush(alert_colors[alert.status]));
-  p.drawRoundedRect(r, radius, radius);
+  QColor semiTransparentYellow(0xff, 0xff, 0x00, 127); // Yellow with 50% opacity.
+  p.setBrush(semiTransparentYellow);
+  p.drawRoundedRect(r, radius, radius); // Draw the rounded rectangle with the yellow background.
 
-  QLinearGradient g(0, r.y(), 0, r.bottom());
-  g.setColorAt(0, QColor::fromRgbF(0, 0, 0, 0.05));
-  g.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0.35));
-
-  p.setCompositionMode(QPainter::CompositionMode_DestinationOver);
-  p.setBrush(QBrush(g));
-  p.drawRoundedRect(r, radius, radius);
-  p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-
-  // text
+  // Set up the text to be drawn.
   const QPoint c = r.center();
-  p.setPen(QColor(0xff, 0xff, 0xff));
+  p.setPen(QColor(0x00, 0x00, 0x00)); // Set the pen to black for the text color.
   p.setRenderHint(QPainter::TextAntialiasing);
+
+  // Draw the text based on the size of the alert.
   if (alert.size == cereal::ControlsState::AlertSize::SMALL) {
     p.setFont(InterFont(74, QFont::DemiBold));
     p.drawText(r, Qt::AlignCenter, alert.text1);
@@ -1596,7 +1614,7 @@ void PedalIcons::paintEvent(QPaintEvent *event) {
   // Adjust the opacity calculation:
   // - Full opacity (1.0) when the car is at a standstill or when the acceleration changes are significant.
   // - A more noticeable minimum opacity when there is no significant change in acceleration.
-  float brakeOpacity = scene.standstill ? maxOpacity : decelerating ? minOpacity + dynamicRange * std::min(std::abs(acceleration) / 0.25f, 1.0f) : minOpacity;
+  float brakeOpacity = scene.standstill ? maxOpacity : decelerating ? minOpacity + dynamicRange * std::min(std::abs(acceleration) / 0.60f, 1.0f) : minOpacity;
   float gasOpacity = accelerating ? minOpacity + dynamicRange * std::min(acceleration / 0.25f, 1.0f) : minOpacity;
 
 

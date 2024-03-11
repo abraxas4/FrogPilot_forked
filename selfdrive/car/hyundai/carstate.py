@@ -208,6 +208,13 @@ class CarState(CarStateBase):
     SpeedLimitController.car_speed_limit = self.calculate_speed_limit(cp, cp_cam) * speed_conv
     SpeedLimitController.write_car_state()
 
+    tpms_unit = cp.vl["TPMS11"]["UNIT"] * 0.725 if int(cp.vl["TPMS11"]["UNIT"]) > 0 else 1.
+    ret.tpms.enabled = True
+    ret.tpms.fl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FL"]
+    ret.tpms.fr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FR"]
+    ret.tpms.rl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RL"]
+    ret.tpms.rr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RR"]
+
     return ret
 
   def update_canfd(self, cp, cp_cam, frogpilot_variables):
@@ -338,6 +345,7 @@ class CarState(CarStateBase):
       ("CGW4", 5),
       ("WHL_SPD11", 50),
       ("SAS11", 100),
+      ("TPMS11", 0),
     ]
 
     if not CP.openpilotLongitudinalControl and CP.carFingerprint not in CAMERA_SCC_CAR:

@@ -536,25 +536,45 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const auto nav_instruction = sm["navInstruction"].getNavInstruction();
 
   // Handle older routes where vCruiseCluster is not set
+  // Choose between getVCruiseCluster and getVCruise based on if getVCruiseCluster returns 0.0
   float v_cruise = cs.getVCruiseCluster() == 0.0 ? cs.getVCruise() : cs.getVCruiseCluster();
+  // If cs (car state) is alive (active), use v_cruise as setSpeed; otherwise, use a predefined "not available" value
   setSpeed = cs_alive ? v_cruise : SET_SPEED_NA;
+  // Determine if cruise control is set by checking if setSpeed is positive and not equal to the "not available" value
   is_cruise_set = setSpeed > 0 && (int)setSpeed != SET_SPEED_NA;
+  // If cruise control is set and the unit is not metric, convert setSpeed from km/h to mph
   if (is_cruise_set && !s.scene.is_metric) {
     setSpeed *= KM_TO_MILE;
   }
 
   // Handle older routes where vEgoCluster is not set
+  // Update v_ego_cluster_seen if it's previously seen or if getVEgoCluster returns a non-zero value
   v_ego_cluster_seen = v_ego_cluster_seen || car_state.getVEgoCluster() != 0.0;
+  // Choose between getVEgoCluster and getVEgo based on v_ego_cluster_seen and if wheel speed is not being used
   float v_ego = v_ego_cluster_seen && !scene.wheel_speed ? car_state.getVEgoCluster() : car_state.getVEgo();
+  // If car state is alive, use max of 0.0 and v_ego as speed; otherwise, use 0.0
   speed = cs_alive ? std::max<float>(0.0, v_ego) : 0.0;
+  // Convert speed to the appropriate unit based on whether the scene is metric
   speed *= s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH;
 
+  // Obtain the speed limit sign from navigation instructions
   auto speed_limit_sign = nav_instruction.getSpeedLimitSign();
-  speedLimit = slcOverridden ? scene.speed_limit_overridden_speed : speedLimitController ? slcSpeedLimit : nav_alive ? nav_instruction.getSpeedLimit() : 0.0;
+  // Determine speed limit based on various conditions such as whether speed limit control is overridden,
+  // if speed limit control is active, or if navigation is alive
+  speedLimit = slcOverridden 
+                ? scene.speed_limit_overridden_speed 
+                : speedLimitController 
+                  ? slcSpeedLimit 
+                  : nav_alive 
+                    ? nav_instruction.getSpeedLimit() 
+                    : 0.0;
+  // Convert the speed limit to the appropriate unit based on the scene's metric system
   speedLimit *= (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH);
+  // If speed limit control is active and not overridden, adjust speed limit by subtracting the offset, if applicable
   if (speedLimitController && !slcOverridden) {
     speedLimit = speedLimit - (showSLCOffset ? slcSpeedLimitOffset : 0);
   }
+
 
   has_us_speed_limit = (nav_alive && speed_limit_sign == cereal::NavInstruction::SpeedLimitSign::MUTCD) || (speedLimitController && !useViennaSLCSign);
   has_eu_speed_limit = (nav_alive && speed_limit_sign == cereal::NavInstruction::SpeedLimitSign::VIENNA) || (speedLimitController && useViennaSLCSign);
@@ -632,16 +652,28 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   // Draw MAX
   QColor max_color = QColor(0x80, 0xd8, 0xa6, 0xff);
   QColor set_speed_color = whiteColor();
+  // Check if cruise control is enabled
   if (is_cruise_set) {
+    // Check if the cruise control status is disengaged
     if (status == STATUS_DISENGAGED) {
+      // Set the maximum color to white
       max_color = whiteColor();
-    } else if (status == STATUS_OVERRIDE) {
+    } 
+    // Check if the cruise control status is overridden
+    else if (status == STATUS_OVERRIDE) {
+      // Set the maximum color to a specific shade of grey
       max_color = QColor(0x91, 0x9b, 0x95, 0xff);
-    } else if (speedLimit > 0) {
+    } 
+    // Check if the speed limit is greater than 0
+    else if (speedLimit > 0) {
+      // Define a lambda function to interpolate between colors based on the current speed limit
       auto interp_color = [=](QColor c1, QColor c2, QColor c3) {
+        // If speed limit is positive, interpolate colors based on set speed and speed limit thresholds; otherwise, return the first color
         return speedLimit > 0 ? interpColor(setSpeed, {speedLimit + 5, speedLimit + 15, speedLimit + 25}, {c1, c2, c3}) : c1;
       };
+      // Interpolate the max color between the current max color, a light orange, and a light red based on the current set speed
       max_color = interp_color(max_color, QColor(0xff, 0xe4, 0xbf), QColor(0xff, 0xbf, 0xbf));
+      // Interpolate the set speed color between dark orange and red based on the current set speed
       set_speed_color = interp_color(set_speed_color, QColor(0xff, 0x95, 0x00), QColor(0xff, 0x00, 0x00));
     }
   } else {

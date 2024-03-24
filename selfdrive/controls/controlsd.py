@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
-import os
-import math
-import time
-import threading
-from types import SimpleNamespace
-from typing import SupportsFloat
+import os  # Standard library for OS interface, like environment variables
+import math  # Standard library for mathematical functions
+import time  # Standard library for time access and conversions
+import threading  # Standard library for higher-level threading interface
+from types import SimpleNamespace  # Utility to create objects with arbitrary attributes
+from typing import SupportsFloat  # Type hinting support
 
+# Imports from the cereal package, Openpilot's messaging system based on Cap'n Proto
 import cereal.messaging as messaging
 import openpilot.selfdrive.sentry as sentry
 
-from cereal import car, log, custom
-from cereal.visionipc import VisionIpcClient, VisionStreamType
+from cereal import car, log, custom  # Import specific modules for car, logging, and custom data structures
+from cereal.visionipc import VisionIpcClient, VisionStreamType  # IPC client for vision processing
 
-from panda import ALTERNATIVE_EXPERIENCE
+from panda import ALTERNATIVE_EXPERIENCE  # Import from panda library, part of Openpilot's hardware interface
 
+# Various Openpilot utility and helper modules for conversions, parameters, real-time scheduling, etc.
 from openpilot.common.conversions import Conversions as CV
 from openpilot.common.numpy_fast import clip
 from openpilot.common.params import Params
 from openpilot.common.realtime import config_realtime_process, Priority, Ratekeeper, DT_CTRL
 from openpilot.common.swaglog import cloudlog
 
+# More specific Openpilot modules for CAN messaging, car state management, and control algorithms
 from openpilot.selfdrive.boardd.boardd import can_list_to_can_capnp
 from openpilot.selfdrive.car.car_helpers import get_car, get_startup_event, get_one_can
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase
@@ -33,23 +36,27 @@ from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.selfdrive.controls.lib.longcontrol import LongControl
 from openpilot.selfdrive.controls.lib.vehicle_model import VehicleModel
 
+# Modules for system hardware information and software versioning
 from openpilot.system.hardware import HARDWARE
 from openpilot.system.version import get_short_branch
 
+# Imports from a custom Openpilot extension or fork, providing additional functionalities
 from openpilot.selfdrive.frogpilot.functions.frogpilot_functions import CRUISING_SPEED
-
 from openpilot.selfdrive.frogpilot.functions.speed_limit_controller import SpeedLimitController
 
+# Constants for various thresholds and configurations specific to the control loop and system behavior
 SOFT_DISABLE_TIME = 3  # seconds
 LDW_MIN_SPEED = 31 * CV.MPH_TO_MS
 LANE_DEPARTURE_THRESHOLD = 0.1
 CAMERA_OFFSET = 0.04
 
+# Flags for different modes of operation, controlled by environment variables
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
 TESTING_CLOSET = "TESTING_CLOSET" in os.environ
 IGNORE_PROCESSES = {"loggerd", "encoderd", "statsd"}
 
+# Mapping and enumeration imports for various state and event types used in the control algorithms
 ThermalStatus = log.DeviceState.ThermalStatus
 State = log.ControlsState.OpenpilotState
 PandaType = log.PandaState.PandaType
@@ -60,7 +67,7 @@ EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
 SafetyModel = car.CarParams.SafetyModel
 GearShifter = car.CarState.GearShifter
-
+# Constants and mappings for handling specific safety modes and camera error events, and defining which actuator fields are available.
 IGNORED_SAFETY_MODES = (SafetyModel.silent, SafetyModel.noOutput)
 CSID_MAP = {"1": EventName.roadCameraError, "2": EventName.wideRoadCameraError, "0": EventName.driverCameraError}
 ACTUATOR_FIELDS = tuple(car.CarControl.Actuators.schema.fields.keys())
@@ -69,78 +76,108 @@ ENABLED_STATES = (State.preEnabled, *ACTIVE_STATES)
 
 
 class CarD:
-  CI: CarInterfaceBase
-  CS: car.CarState
+  # Type annotations for class attributes. These ensure that the attributes conform to expected types,
+  # enhancing code readability, safety, and enabling static type checking.
+  CI: CarInterfaceBase  # Expected to be an instance of CarInterfaceBase or a subclass thereof.
+  CS: car.CarState      # Expected to be an instance of CarState, representing the vehicle's current state.
 
+  # The constructor for the CarD class. Initializes communication with the car and sets up messaging.
   def __init__(self, CI=None):
+    # Set up a subscriber socket for CAN messages with a 20 ms timeout. This socket listens for messages from the car's CAN bus.
     self.can_sock = messaging.sub_sock('can', timeout=20)
+    
+    # Create a SubMaster object for subscribing to 'pandaStates' messages. This provides information about the panda device's state.
     self.sm = messaging.SubMaster(['pandaStates'])
+    
+    # Create a PubMaster object for publishing messages on 'sendcan', 'carState', and 'carParams' channels.
     self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams'])
 
-    self.can_rcv_timeout_counter = 0      # conseuctive timeout count
-    self.can_rcv_cum_timeout_counter = 0  # cumulative timeout count
+    # Initialize counters for tracking consecutive and cumulative CAN message receive timeouts.
+    self.can_rcv_timeout_counter = 0
+    self.can_rcv_cum_timeout_counter = 0
 
+    # Initialize a Params object for accessing Openpilot parameters.
     self.params = Params()
 
+    # If no CarInterfaceBase instance is provided, initialize one by detecting the car model
+    # and setting up car-specific parameters and interfaces.
     if CI is None:
-      # wait for one pandaState and one CAN packet
       print("Waiting for CAN messages...")
-      get_one_can(self.can_sock)
+      get_one_can(self.can_sock)  # Wait for at least one CAN message to ensure communication is established.
 
+      # Determine the number of connected panda devices by checking the length of the pandaStates array.
       num_pandas = len(messaging.recv_one_retry(self.sm.sock['pandaStates']).pandaStates)
+      
+      # Check if experimental longitudinal control is enabled in the parameters.
       experimental_long_allowed = self.params.get_bool("ExperimentalLongitudinalEnabled")
+      
+      # Call get_car() to initialize the CarInterface and CarParams specific to the detected car model.
       self.CI, self.CP = get_car(self.can_sock, self.pm.sock['sendcan'], experimental_long_allowed, num_pandas)
     else:
-      self.CI, self.CP = CI, CI.CP
+      self.CI, self.CP = CI, CI.CP  # Use the provided CarInterfaceBase instance and its CarParams.
 
+  # Initialize the CarInterface object once the control loop is ready to interact with the vehicle.
   def initialize(self):
     """Initialize CarInterface, once controls are ready"""
     self.CI.init(self.CP, self.can_sock, self.pm.sock['sendcan'])
 
+  # Method to update the car's state based on incoming CAN messages and control commands.
   def state_update(self, CC: car.CarControl, frogpilot_variables):
-    """carState update loop, driven by can"""
 
     # TODO: This should not depend on carControl
-
-    # Update carState from CAN
+    
+    # Read all available CAN messages from the socket, blocking until at least one message is received.
     can_strs = messaging.drain_sock_raw(self.can_sock, wait_for_one=True)
+    
+    # Update the CarState object using data from CAN messages and the current car controls.
     self.CS = self.CI.update(CC, can_strs, frogpilot_variables)
 
+    # Update the SubMaster object, which manages subscriptions to other message channels.
     self.sm.update(0)
 
+    # Determine if valid CAN messages were received based on their quantity.
     can_rcv_valid = len(can_strs) > 0
 
-    # Check for CAN timeout
+    # If no CAN messages were received, increment the timeout counters. Otherwise, reset the consecutive timeout counter.
     if not can_rcv_valid:
       self.can_rcv_timeout_counter += 1
       self.can_rcv_cum_timeout_counter += 1
     else:
       self.can_rcv_timeout_counter = 0
 
+    # A timeout is flagged if there have been 5 or more consecutive cycles without receiving a CAN message.
     self.can_rcv_timeout = self.can_rcv_timeout_counter >= 5
 
+    # In replay mode, log the mono time from the first CAN message for simulation purposes.
     if can_rcv_valid and REPLAY:
       self.can_log_mono_time = messaging.log_from_bytes(can_strs[0]).logMonoTime
 
-    return self.CS
+    return self.CS  # Return the updated CarState object.
 
+  # Method to publish the current state of the car and its parameters to other Openpilot components.
   def state_publish(self, car_events):
-    """carState and carParams publish loop"""
 
     # TODO: carState should be independent of the event loop
 
-    # carState
+    # Prepare a new 'carState' message. This message contains the current state of the car,
+    # including all relevant sensor data and any events that might affect driving behavior.
     cs_send = messaging.new_message('carState')
-    cs_send.valid = self.CS.canValid
-    cs_send.carState = self.CS
-    cs_send.carState.events = car_events
+    cs_send.valid = self.CS.canValid  # Set the validity of the message based on the car state's validity.
+    cs_send.carState = self.CS  # Attach the current car state.
+    cs_send.carState.events = car_events  # Include any car events that have occurred.
+    
+    # Send the 'carState' message through the PubMaster, making the car state available to other components.
     self.pm.send('carState', cs_send)
 
-    # carParams - logged every 50 seconds (> 1 per segment)
+    # Periodically log 'carParams' for diagnostics and analysis. This includes static car parameters
+    # that don't change often but are crucial for the operation of Openpilot.
+    # This is done every 50 seconds to ensure there's at least one log per driving segment.
     if (self.sm.frame % int(50. / DT_CTRL) == 0):
       cp_send = messaging.new_message('carParams')
-      cp_send.valid = True
-      cp_send.carParams = self.CP
+      cp_send.valid = True  # Mark the message as valid.
+      cp_send.carParams = self.CP  # Attach the car parameters.
+      
+      # Send the 'carParams' message through the PubMaster.
       self.pm.send('carParams', cp_send)
 
   def controls_update(self, CC: car.CarControl, frogpilot_variables):

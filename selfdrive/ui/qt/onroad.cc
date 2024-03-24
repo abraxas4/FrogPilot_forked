@@ -19,28 +19,45 @@
 #endif
 
 static void drawIcon(QPainter &p, const QPoint &center, const QPixmap &img, const QBrush &bg, float opacity) {
-  p.setRenderHint(QPainter::Antialiasing);
-  p.setOpacity(1.0);  // bg dictates opacity of ellipse
-  p.setPen(Qt::NoPen);
-  p.setBrush(bg);
-  p.drawEllipse(center, btn_size / 2, btn_size / 2);
-  p.setOpacity(opacity);
-  p.drawPixmap(center - QPoint(img.width() / 2, img.height() / 2), img);
-  p.setOpacity(1.0);
-}
+  p.save(); // Save the QPainter's current state
 
+  p.setRenderHint(QPainter::Antialiasing);
+  
+  // Draw the background ellipse with full opacity set by bg
+  p.setOpacity(1.0); // Ensure the background is fully opaque
+  p.setPen(Qt::NoPen);
+  p.setBrush(bg);
+  p.drawEllipse(center, btn_size / 2, btn_size / 2);
+
+  // Draw the icon pixmap with the specified opacity
+  p.setOpacity(opacity); // Apply the specified opacity for the icon image
+  p.drawPixmap(center - QPoint(img.width() / 2, img.height() / 2), img);
+
+  // Conditionally draw a white border around the ellipse based on drawBorder
+  if (AnnotatedCameraWidget::GetDrawBorder()) {
+    QPen borderPen(Qt::white, 0); // White color, 0 thickness for one-pixel-wide line
+    p.setOpacity(1.0); // Reset the opacity to fully opaque for the border
+    p.setPen(borderPen);
+    p.drawEllipse(center, btn_size / 2, btn_size / 2);
+  }
+
+  p.restore(); // Restore the QPainter's state to what it was before modifications
+}
 static void drawIconRotate(QPainter &p, const QPoint &center, const QPixmap &img, const QBrush &bg, float opacity, const int angle) {
+  p.save();
+
   p.setRenderHint(QPainter::Antialiasing);
   p.setOpacity(1.0);  // bg dictates opacity of ellipse
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
   p.drawEllipse(center, btn_size / 2, btn_size / 2);
-  p.save();
+  //p.save();
   p.translate(center);
   p.rotate(-angle);
   p.setOpacity(opacity);
   p.drawPixmap(-QPoint(img.width() / 2, img.height() / 2), img);
   p.setOpacity(1.0);
+
   p.restore();
 }
 
@@ -244,54 +261,34 @@ void OnroadWindow::paintEvent(QPaintEvent *event) {
   QPainter p(this);
   p.fillRect(rect(), QColor(bg.red(), bg.green(), bg.blue(), 255));
 
-  // Draw FPS on screen
   if (scene.fps_counter) {
     updateFPSCounter();
 
-    const SubMaster &sm = *(uiState()->sm);
-    const auto car_state = sm["carState"].getCarState();
-
-    // getTpms(), getFl(), ... are auto-generated in cereal/gen/cpp/car.capnp.h
-    float tpms_fl = car_state.getTpms().getFl();
-    float tpms_fr = car_state.getTpms().getFr();
-    float tpms_rl = car_state.getTpms().getRl();
-    float tpms_rr = car_state.getTpms().getRr();
-
-    QString fpsDisplayString = QString("TPMS: F(%1:$2) R(%3:%4) | FPS: %5 (%6) | Min: %7 | Max: %8 | Avg: %9")
-        .arg(tpms_fl, 0, 'f', 2) // Tire pressure for front left tire
-        .arg(tpms_fr, 0, 'f', 2) // Tire pressure for front right tire
-        .arg(tpms_rl, 0, 'f', 2) // Tire pressure for rear left tire
-        .arg(tpms_rr, 0, 'f', 2) // Tire pressure for rear right tire
+    QString fpsDisplayString = QString("FPS: %1 (%2) | Min: %3 | Max: %4 | Avg: %5")
         .arg(fps, 0, 'f', 2)
         .arg(paramsMemory.getInt("CameraFPS"))
         .arg(minFPS, 0, 'f', 2)
         .arg(maxFPS, 0, 'f', 2)
         .arg(avgFPS, 0, 'f', 2);
 
-    // Configure the text
-    p.setFont(InterFont(30, QFont::DemiBold));
+    // Configure the text with a monospaced font
+    QFont monospaceFont("Monospace", 25, QFont::DemiBold);
+    monospaceFont.setStyleHint(QFont::TypeWriter);
+    p.setFont(monospaceFont);
     p.setRenderHint(QPainter::TextAntialiasing);
     p.setPen(Qt::white);
 
     QRect currentRect = rect();
-    // Left aligned
-    #if true
-    // Define the desired left margin
-    int leftMargin = 10; // You can adjust this value to whatever margin you want
+    int leftMargin = 10; // Adjust the margin as needed
     int xPos = leftMargin;
-    #else
-    // Center the text
-    int textWidth = p.fontMetrics().horizontalAdvance(fpsDisplayString);    
-    int xPos = (currentRect.width() - textWidth) / 2;
-    #endif
     int yPos = currentRect.bottom() - 5;
 
     // Draw the text
     p.drawText(xPos, yPos, fpsDisplayString);
-
     update();
   }
 }
+
 
 void OnroadWindow::updateFPSCounter() {
   qint64 currentMillis = QDateTime::currentMSecsSinceEpoch();
@@ -466,7 +463,12 @@ void ExperimentalButton::paintEvent(QPaintEvent *event) {
     if (rotatingWheel || firefoxRandomEventTriggered) {
       drawIconRotate(p, QPoint(btn_size / 2, btn_size / 2 + y_offset), img, background_color, (isDown() || !(engageable || scene.always_on_lateral_active)) ? 0.6 : 1.0, steeringAngleDeg);
     } else {
-      drawIcon(p, QPoint(btn_size / 2, btn_size / 2 + y_offset), img, background_color, (isDown() || !(engageable || scene.always_on_lateral_active)) ? 0.6 : 1.0);
+      drawIcon(
+        p, 
+        QPoint(btn_size / 2, btn_size / 2 + y_offset), 
+        img, 
+        background_color, 
+        (isDown() || !(engageable || scene.always_on_lateral_active)) ? 0.6 : 1.0);
     }
   }
 }
@@ -487,43 +489,71 @@ void MapSettingsButton::paintEvent(QPaintEvent *event) {
   drawIcon(p, QPoint(btn_size / 2, btn_size / 2), settings_img, QColor(0, 0, 0, 166), isDown() ? 0.6 : 1.0);
 }
 
-
-// Window that shows camera view and variety of info drawn on top
-AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraWidget("camerad", type, true, parent), scene(uiState()->scene) {
+bool AnnotatedCameraWidget::drawBorder = false;
+// Constructor for AnnotatedCameraWidget, which is a window displaying the camera view and other overlays.
+AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent)
+  : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), // Initialize a filter to smooth out the frames per second display
+    CameraWidget("camerad", type, true, parent), // Call the base class constructor with parameters for camera setup
+    scene(uiState()->scene) // Initialize scene with the current UI state's scene
+{
+  // Create a publisher to send debug messages to the 'uiDebug' channel
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
+  // Set up the main layout for the widget with a specified border size and no spacing
   main_layout = new QVBoxLayout(this);
   main_layout->setMargin(UI_BORDER_SIZE);
   main_layout->setSpacing(0);
 
-  QHBoxLayout *buttons_layout = new QHBoxLayout();
-  buttons_layout->setSpacing(0);
+  // Layout for the buttons that will be displayed horizontally
+  QHBoxLayout *buttons_layout_h = new QHBoxLayout();
+  {
+    buttons_layout_h->setContentsMargins(0, 0, 0, 0);
+    buttons_layout_h->setSpacing(0);
 
-  // Neokii screen recorder
-  recorder_btn = new ScreenRecorder(this);
-  buttons_layout->addWidget(recorder_btn);
+    // Brake disc icon
+    brake_disc_icons = new BrakeDiscIcons(uiState(), this);
+    buttons_layout_h->addWidget(brake_disc_icons);
+    
+    // Tire pressure icon
+    tire_pressure_icons = new TirePressureIcons(uiState(), this);
+    buttons_layout_h->addWidget(tire_pressure_icons);
 
-  experimental_btn = new ExperimentalButton(this);
-  buttons_layout->addWidget(experimental_btn);
+    // Add a screen recorder button to the buttons layout
+    recorder_btn = new ScreenRecorder(this);
+    buttons_layout_h->addWidget(recorder_btn);
 
+    // Add an experimental feature button next to the recorder button
+    experimental_btn = new ExperimentalButton(this);
+    buttons_layout_h->addWidget(experimental_btn);
+  }
+  // Set up a layout for the top-right corner of the window
   QVBoxLayout *top_right_layout = new QVBoxLayout();
-  top_right_layout->setSpacing(0);
-  top_right_layout->addLayout(buttons_layout);
+  {
+    top_right_layout->setSpacing(0);
 
-  pedal_icons = new PedalIcons(this);
-  top_right_layout->addWidget(pedal_icons, 0, Qt::AlignRight);
+    top_right_layout->addLayout(buttons_layout_h); // Add the buttons layout to the top-right layout
 
+    // Add icons to indicate the status of the pedals, aligned to the right
+    pedal_icons = new PedalIcons(this);
+    top_right_layout->addWidget(pedal_icons, 0, Qt::AlignRight);
+  }
+  // Add the top-right layout to the main layout and align it appropriately
   main_layout->addLayout(top_right_layout, 0);
   main_layout->setAlignment(top_right_layout, Qt::AlignTop | Qt::AlignRight);
 
+  // Add a button for map settings at the bottom right of the window
   map_settings_btn = new MapSettingsButton(this);
   main_layout->addWidget(map_settings_btn, 0, Qt::AlignBottom | Qt::AlignRight);
 
+  // Load an image of the driver's face and set its size
   dm_img = loadPixmap("../assets/img_driver_face.png", {img_size + 5, img_size + 5});
 
-  // Initialize FrogPilot widgets
+  //drawBorder = true; // for understanding the UI icons' positions.
+
+  // Call a function to initialize additional widgets specific to FrogPilot
   initializeFrogPilotWidgets();
 }
+
 
 void AnnotatedCameraWidget::updateState(const UIState &s) {
   const int SET_SPEED_NA = 255;
@@ -551,7 +581,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   // Update v_ego_cluster_seen if it's previously seen or if getVEgoCluster returns a non-zero value
   v_ego_cluster_seen = v_ego_cluster_seen || car_state.getVEgoCluster() != 0.0;
   // Choose between getVEgoCluster and getVEgo based on v_ego_cluster_seen and if wheel speed is not being used
-  float v_ego = v_ego_cluster_seen && !scene.wheel_speed ? car_state.getVEgoCluster() : car_state.getVEgo();
+  float v_ego = ((v_ego_cluster_seen && !scene.wheel_speed) ? car_state.getVEgoCluster() : car_state.getVEgo());
   // If car state is alive, use max of 0.0 and v_ego as speed; otherwise, use 0.0
   speed = cs_alive ? std::max<float>(0.0, v_ego) : 0.0;
   // Convert speed to the appropriate unit based on whether the scene is metric
@@ -599,19 +629,43 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
     main_layout->setAlignment(map_settings_btn, (rightHandDM ? Qt::AlignLeft : Qt::AlignRight) | (compass ? Qt::AlignTop : Qt::AlignBottom));
   }
 }
-
 void AnnotatedCameraWidget::drawHud(QPainter &p) {
   p.save();
 
   // Header gradient
+  drawHeaderGradient(p);
+
+  // Set speed (cruise control speed) && Speed limit sign
+  drawSpeedLimitSign(p);
+
+  // current speed
+  if (!scene.hide_speed && !fullMapOpen) {
+    drawSpeed(p);
+  }
+
+  // Draw the car state values
+  drawCarStateOverlay(p);
+
+  p.restore();
+
+}
+// Enhances the visibility of text and icons at the top. 
+// This is important as the top area can be hard to see against a bright sky.
+void AnnotatedCameraWidget::drawHeaderGradient(QPainter &p) {
+  p.save();  // Save the QPainter's current state
+
   QLinearGradient bg(0, UI_HEADER_HEIGHT - (UI_HEADER_HEIGHT / 2.5), 0, UI_HEADER_HEIGHT);
   bg.setColorAt(0, QColor::fromRgbF(0, 0, 0, 0.45));
   bg.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0));
   p.fillRect(0, 0, width(), UI_HEADER_HEIGHT, bg);
 
+  p.restore();
+}
+void AnnotatedCameraWidget::drawSpeedLimitSign(QPainter &p) {
+  p.save();  // Save the QPainter's current state
+  
   QString speedLimitStr = (speedLimit > 1) ? QString::number(std::nearbyint(speedLimit)) : "–";
   QString speedLimitOffsetStr = slcSpeedLimitOffset == 0 ? "–" : QString::number(slcSpeedLimitOffset, 'f', 0).prepend(slcSpeedLimitOffset > 0 ? "+" : "");
-  QString speedStr = QString::number(std::nearbyint(speed));
   QString setSpeedStr = is_cruise_set ? QString::number(std::nearbyint(setSpeed - cruiseAdjustment)) : "–";
 
   // Draw outer box + border to contain set speed and speed limit
@@ -735,27 +789,212 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
       p.setFont(InterFont((speedLimitStr.size() >= 3) ? 60 : 70, QFont::Bold));
       p.drawText(sign_rect, Qt::AlignCenter, speedLimitStr);
     }
-    p.restore();
-  }
-
-  // current speed
-  if (!(scene.hide_speed || fullMapOpen)) {
-    p.setFont(InterFont(176, QFont::Bold));
-    drawText(p, rect().center().x(), 210, speedStr);
-    p.setFont(InterFont(66));
-    drawText(p, rect().center().x(), 290, speedUnit, 200);
+    p.restore();  // Restore the QPainter's state before exiting the function
   }
 
   p.restore();
 }
 
-void AnnotatedCameraWidget::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
-  QRect real_rect = p.fontMetrics().boundingRect(text);
-  real_rect.moveCenter({x, y - real_rect.height() / 2});
+void AnnotatedCameraWidget::drawSpeed(QPainter &p) {
+  p.save(); // Save the current state of the painter
 
-  p.setPen(QColor(0xff, 0xff, 0xff, alpha));
-  p.drawText(real_rect.x(), real_rect.bottom(), text);
+  // Set dynamic color based on acceleration
+  const SubMaster &sm = *(uiState()->sm);
+  const auto car_state = sm["carState"].getCarState();
+  float accel = car_state.getAEgo();
+
+  QColor color = whiteColor(230); // Start with white color for text
+  if(accel > 0) {
+    int a = (int)(255.f - (180.f * (accel/2.f)));
+    a = std::min(a, 255);
+    a = std::max(a, 80);
+    color = QColor(a, a, 255, 230); // bluish
+  }
+  else {
+    int a = (int)(255.f - (255.f * (-accel/3.f)));
+    a = std::min(a, 255);
+    a = std::max(a, 60);
+    color = QColor(255, a, a, 230); // reddish
+  }
+
+  // Prepare the strings for display
+  QString speedStr = QString::number(static_cast<int>(std::nearbyint(speed)));
+  QString speedUnitStr = speedUnit;
+
+  // Set up fonts and metrics for text size calculation
+  QFont speedFont = InterFont(176, QFont::Bold);
+  QFont unitFont = InterFont(66, QFont::Normal);
+  p.setFont(speedFont);
+  QFontMetrics speedMetrics(speedFont);
+  QFontMetrics unitMetrics(unitFont);
+
+  // Calculate rectangles for speed and unit with padding
+  int rectWidth = std::max(speedMetrics.horizontalAdvance(speedStr), unitMetrics.horizontalAdvance(speedUnitStr)) + 40; // Extra padding
+  int speedRectHeight = speedMetrics.height() + 0;
+  int unitRectHeight = unitMetrics.height() + 10;
+
+  // Position rectangles
+  int x = rect().center().x() - (rectWidth / 2);
+  int speedY = 50;
+  int unitY = speedY + speedRectHeight + 0;
+
+  // Draw speed text with dynamic color
+  QRect speedRect(x, speedY, rectWidth, speedRectHeight); // (x, y) width, height
+  p.setPen(QPen(color));
+  p.drawText(speedRect, Qt::AlignCenter, speedStr);
+
+  // Draw unit text
+  QRect unitRect(x, unitY, rectWidth, unitRectHeight);
+  p.setFont(unitFont);
+  p.setPen(QPen(is_metric ? whiteColor() : yellowColor())); // Color for unit based on metric or imperial
+  p.drawText(unitRect, Qt::AlignCenter, speedUnitStr);
+
+  // Conditionally draw borders around both rectangles based on drawBorder member variable
+  if (GetDrawBorder()) {
+    p.setPen(QPen(whiteColor(), 0)); // setting : White border with thickness of 0 (one pixel wide)
+    p.drawRect(speedRect); // Draws a border directly around speedRect
+    p.drawRect(unitRect); // Draws a border directly around unitRect
+  }
+  p.restore(); // Restore the painter's state
 }
+
+void AnnotatedCameraWidget::drawCarStateOverlay(QPainter &p) {
+  if(mapOpen) return;
+
+  p.save(); // Save the current state of the painter
+
+  const SubMaster &sm = *(uiState()->sm);
+  const auto car_state = sm["carState"].getCarState();
+  const auto cruise_state = car_state.getCruiseState();
+
+  // Create and set a monospaced font for consistent text spacing and alignment
+  QFont monospaceFont("Monospace", 20, QFont::Normal); // Configure the font
+  monospaceFont.setStyleHint(QFont::TypeWriter); // Suggest using a typewriter-style monospaced font
+  p.setFont(monospaceFont); // Apply the font to the QPainter
+  QFontMetrics fm(monospaceFont);
+
+  int marginX = btn_size + 30; // width of icons in the right (vertical)
+  int marginY = btn_size + 30; // height of icons in the top (horizontal)
+  int spacing = fm.height() + 0;
+  int rectWidth = 450; // Adjust as needed to fit longer strings
+  int rectX1 = width() - rectWidth - marginX; // Position to the right
+  int rectY = marginY; // Position from top
+
+  // Create a semi-transparent rectangle
+  int rectHeight1 = spacing * 25; // Adjust based on the number of items you're displaying
+  QRect rect1(rectX1, rectY, rectWidth, rectHeight1);
+  
+  int rectHeight2 = spacing * 15; // Height for 20 lines
+  int rectX2 = 0 + fm.horizontalAdvance('A')*16;
+  QRect rect2(rectX2, rectY, rectWidth, rectHeight2);
+  #if 0
+  {//fill the rectangle
+    QColor semiTransparentColor(0, 0, 0, 100); // Adjust the alpha for transparency
+    // Draw semi-transparent rectangle with a border
+    p.fillRect(rect, semiTransparentColor);
+  }
+  #endif
+  // Optionally draw the rectangle border based on the drawBorder flag
+  if (GetDrawBorder()) {
+    // Adjust the pen for drawing the border with desired color and thickness
+    p.setPen(QPen(Qt::white, 1)); // Here, setting border color to white and thickness to 1 pixel
+    p.drawRect(rect1);
+    p.drawRect(rect2);
+  }
+
+  // Prepare to draw text
+  p.setPen(QColor(255, 255, 255)); // White text
+
+  // Set initial position for text
+  int lineX = rectX1; // Use full width starting from the left edge
+  int lineY = rectY;
+
+  // Helper lambda to draw text and increment line position
+  auto drawTextLine = [&](const QString &text) {
+    QRect textRect(lineX, lineY, rectWidth, spacing);
+    p.drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, text);
+    lineY += spacing; // Move to the next line position
+  };
+
+  // Assuming car_state.getVEgo() gives you the speed in m/s
+  drawTextLine(QString("Speed    : %1 km/h").arg(static_cast<int>(std::round(car_state.getVEgo()        * MS_TO_KPH)), 3, 10, QChar(' ')));
+  drawTextLine(QString("  Raw    : %1 km/h").arg(static_cast<int>(std::round(car_state.getVEgoRaw()     * MS_TO_KPH)), 3, 10, QChar(' ')));
+  drawTextLine(QString("  Cluster: %1 km/h").arg(static_cast<int>(std::round(car_state.getVEgoCluster() * MS_TO_KPH)), 3, 10, QChar(' ')));
+
+  drawTextLine(QString("Gas      : %1").arg(car_state.getGas()));  
+  drawTextLine(QString("  Pressed: %1").arg(car_state.getGasPressed() ? "Yes" : "-"));
+  drawTextLine(QString("  Accel  : %1 m/s²").arg(car_state.getAEgo()));
+
+  drawTextLine(QString("Brake Pressed : %1").arg(car_state.getBrakePressed() ? "Yes" : "-"));
+  drawTextLine(QString("  Brake Lights: %1").arg(car_state.getBrakeLights() ? "ON" : "Off"));
+  drawTextLine(QString("  Regenerative: %1").arg(car_state.getRegenBraking() ? "Yes" : "-"));
+  drawTextLine(QString("  Standstill  : %1").arg(car_state.getStandstill() ? "Stopped" : "-"));
+  drawTextLine(QString("  Hold Active : %1").arg(car_state.getBrakeHoldActive() ? "Yes" : "-"));
+  drawTextLine(QString("  Auto Hold   : %1").arg(car_state.getAutoHold()? "Yes" : "-"));
+  drawTextLine(QString("  Parking     : %1").arg(car_state.getParkingBrake() ? "Engaged" : "Disengaged"));
+
+  drawTextLine(QString("Longitudinal : %1").arg(scene.longitudinal_control ? "Yes" : "-")); // CP.openpilotLongitudinalControl
+  drawTextLine(QString("  Cruise GapAdjust : %1").arg(cruise_state.getGapAdjust()));
+  drawTextLine(QString("  Cruise StandStill: %1").arg(cruise_state.getStandstill() ? "Yes" : "-"));
+
+
+  drawTextLine(QString("Cruise : %1").arg(cruise_state.getEnabled() ? "Yes" : "-"));
+  drawTextLine(QString("  Available: %1").arg(cruise_state.getAvailable() ? "Yes" : "-"));
+  drawTextLine(QString("  Adaptive : %1").arg(cruise_state.getNonAdaptive() ? "-" : "Yes"));
+  drawTextLine(QString("  Speed    : %1 km/h").arg(static_cast<int>(std::round(cruise_state.getSpeed()       * MS_TO_KPH)), 3, 10, QChar(' ')));
+  drawTextLine(QString("    Cluster: %1 km/h").arg(static_cast<int>(std::round(cruise_state.getSpeedCluster()* MS_TO_KPH)), 3, 10, QChar(' ')));
+  drawTextLine(QString("    Offset : %1 km/h").arg(static_cast<int>(std::round(cruise_state.getSpeedOffset() * MS_TO_KPH)), 3, 10, QChar(' ')));
+  
+  // --------------------------------------
+  // Set initial position for text in rect2
+  lineX = rectX2;
+  lineY = rectY;
+
+  drawTextLine(QString("Nav Speed Limit: %1").arg(car_state.getNavSpeedLimit()));
+  drawTextLine(QString("RPM: %1").arg(car_state.getEngineRpm()));    
+  drawTextLine(QString("Yaw Rate: %1 rad/s").arg(car_state.getYawRate()));
+  drawTextLine(QString("ESP : %1").arg(car_state.getEspDisabled() ? "No" : "Yes"));
+
+  // Translate enum to string for gear shifter
+  QString gearShifterString;
+  switch(car_state.getGearShifter()) {
+    case cereal::CarState::GearShifter::PARK: 
+      gearShifterString = "PARK"; break;
+    case cereal::CarState::GearShifter::REVERSE: 
+      gearShifterString = "REVERSE"; break;
+    case cereal::CarState::GearShifter::NEUTRAL: 
+      gearShifterString = "NEUTRAL"; break;
+    case cereal::CarState::GearShifter::ECO: 
+      gearShifterString = "ECO"; break;
+    case cereal::CarState::GearShifter::MANUMATIC: 
+      gearShifterString = "MANUMATIC"; break;
+    case cereal::CarState::GearShifter::DRIVE: 
+      gearShifterString = "DRIVE"; break;
+    case cereal::CarState::GearShifter::SPORT: 
+      gearShifterString = "SPORT"; break;
+    case cereal::CarState::GearShifter::LOW: 
+      gearShifterString = "LOW"; break;
+    case cereal::CarState::GearShifter::BRAKE: 
+      gearShifterString = "BRAKE"; break;
+    default: 
+      gearShifterString = "UNKNOWN"; break;
+  }
+  drawTextLine(QString("Gear: %1").arg(gearShifterString));
+
+  // More boolean values to strings
+  drawTextLine(QString("Door Open: %1").arg(car_state.getDoorOpen() ? "OPENED" : "all closed"));
+  drawTextLine(QString("Seatbelt : %1").arg(car_state.getSeatbeltUnlatched() ? "NOT YET" : "latched"));  
+  drawTextLine(QString("TPMS FL: %1 FR: %2").arg(car_state.getTpms().getFl()).arg(car_state.getTpms().getFr()));
+  drawTextLine(QString("     RL: %1 RR: %2").arg(car_state.getTpms().getRl()).arg(car_state.getTpms().getRr()));
+  drawTextLine(QString("Fuel Gauge: %1%").arg(static_cast<int>(std::round(car_state.getFuelGauge() * 100))));
+  drawTextLine(QString("Charging: %1").arg(car_state.getCharging() ? "Yes" : "No"));
+
+  // Finish up by restoring the painter's state
+  p.restore();
+}
+
+
+// ----------------------------------------------------------------------------------
 
 void AnnotatedCameraWidget::initializeGL() {
   CameraWidget::initializeGL();
@@ -1186,52 +1425,65 @@ void AnnotatedCameraWidget::showEvent(QShowEvent *event) {
   prev_draw_t = millis_since_boot();
 }
 
-// FrogPilot widgets
+// This function is responsible for initializing the widgets specific to FrogPilot in the AnnotatedCameraWidget.
 void AnnotatedCameraWidget::initializeFrogPilotWidgets() {
+  // Create a new horizontal layout that will hold the widgets at the bottom of the AnnotatedCameraWidget.
   bottom_layout = new QHBoxLayout();
 
+  // Add a button that likely allows the user to change or set the "personality" of FrogPilot.
   personality_btn = new PersonalityButton(this);
   bottom_layout->addWidget(personality_btn);
 
+  // Add a spacer item that will expand to fill any available space, pushing adjacent widgets apart.
   QSpacerItem *spacer = new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum);
   bottom_layout->addItem(spacer);
 
+  // Add a compass image widget, possibly for showing the vehicle's orientation.
   compass_img = new Compass(this);
   bottom_layout->addWidget(compass_img);
 
+  // Add a second map settings button at the bottom of the layout, possibly offering redundant access for convenience.
   map_settings_btn_bottom = new MapSettingsButton(this);
   bottom_layout->addWidget(map_settings_btn_bottom);
 
+  // Insert the bottom_layout into the main_layout, adding all the bottom widgets to the AnnotatedCameraWidget.
   main_layout->addLayout(bottom_layout);
 
-  // Custom themes configuration
+  // Define a custom themes configuration, possibly for theming the UI with different color schemes and visual elements.
+  // Each theme has an ID, name, an unknown numeric value (perhaps related to its selection order or priority),
+  // a base color, and a gradient configuration with three points defined by a position and a QBrush with a color and opacity.
   themeConfiguration = {
+    // Entry for the "frog_theme" with a green color scheme.
     {1, {"frog_theme", 4, QColor(23, 134, 68, 242), {{0.0, QBrush(QColor::fromHslF(144 / 360., 0.71, 0.31, 0.9))},
                                                       {0.5, QBrush(QColor::fromHslF(144 / 360., 0.71, 0.31, 0.5))},
                                                       {1.0, QBrush(QColor::fromHslF(144 / 360., 0.71, 0.31, 0.1))}}}},
+    // Entry for the "tesla_theme" with a blue color scheme.
     {2, {"tesla_theme", 4, QColor(0, 72, 255, 255), {{0.0, QBrush(QColor::fromHslF(223 / 360., 1.0, 0.5, 0.9))},
                                                       {0.5, QBrush(QColor::fromHslF(223 / 360., 1.0, 0.5, 0.5))},
                                                       {1.0, QBrush(QColor::fromHslF(223 / 360., 1.0, 0.5, 0.1))}}}},
+    // Entry for the "stalin_theme" with a red color scheme.
     {3, {"stalin_theme", 6, QColor(255, 0, 0, 255), {{0.0, QBrush(QColor::fromHslF(0 / 360., 1.0, 0.5, 0.9))},
                                                       {0.5, QBrush(QColor::fromHslF(0 / 360., 1.0, 0.5, 0.5))},
                                                       {1.0, QBrush(QColor::fromHslF(0 / 360., 1.0, 0.5, 0.1))}}}}
   };
 
-  // Initialize the timer for the turn signal animation
+  // Initialize a timer that will be used for animating the turn signal, assuming there's a turn signal animation.
   animationTimer = new QTimer(this);
   connect(animationTimer, &QTimer::timeout, this, [this] {
-    animationFrameIndex = (animationFrameIndex + 1) % totalFrames;
+    animationFrameIndex = (animationFrameIndex + 1) % totalFrames; // Cycle through the frames of the animation.
   });
 
-  // Initialize the timer for the screen recorder
+  // Set up a timer that updates the screen recorder button, potentially to show recording status or time.
   QTimer *record_timer = new QTimer(this);
   connect(record_timer, &QTimer::timeout, this, [this]() {
     if (recorder_btn) {
-      recorder_btn->update_screen();
+      recorder_btn->update_screen(); // Call a function to update the screen recorder button.
     }
   });
+  // Start the timer with an interval set to refresh at the UI's frame rate.
   record_timer->start(1000 / UI_FREQ);
 }
+
 
 void AnnotatedCameraWidget::updateFrogPilotWidgets(QPainter &p) {
   alwaysOnLateral = scene.always_on_lateral;
@@ -1309,18 +1561,25 @@ void AnnotatedCameraWidget::updateFrogPilotWidgets(QPainter &p) {
       drawSLCConfirmation(p);
     }
   }
+  // -----------------------------------
+  // update/draw bottons, Icons, ...
+  tire_pressure_icons->setVisible(!mapOpen);
+  tire_pressure_icons->updateState();
 
-  bool enableCompass = compass && !hideBottomIcons;
-  compass_img->setVisible(enableCompass);
-  if (enableCompass) {
-    compass_img->updateState(scene.bearing_deg);
-    bottom_layout->setAlignment(compass_img, (rightHandDM ? Qt::AlignLeft : Qt::AlignRight));
-  }
+  brake_disc_icons->setVisible(true);
+  brake_disc_icons->updateState();
 
   bool enablePedalIcons = pedalsOnUI && !fullMapOpen;
   pedal_icons->setVisible(enablePedalIcons);
   if (enablePedalIcons) {
     pedal_icons->updateState();
+  }
+  //
+  bool enableCompass = compass && !hideBottomIcons;
+  compass_img->setVisible(enableCompass);
+  if (enableCompass) {
+    compass_img->updateState(scene.bearing_deg);
+    bottom_layout->setAlignment(compass_img, (rightHandDM ? Qt::AlignLeft : Qt::AlignRight));
   }
 
   bool enablePersonalityButton = onroadAdjustableProfiles && !hideBottomIcons;
@@ -1340,6 +1599,7 @@ void AnnotatedCameraWidget::updateFrogPilotWidgets(QPainter &p) {
 
   recorder_btn->setVisible(!mapOpen);
 
+  // ----------------------------------------------------------
   // Update the turn signal animation images upon toggle change
   if (customSignals != scene.custom_signals) {
     customSignals = scene.custom_signals;
@@ -1368,128 +1628,55 @@ void AnnotatedCameraWidget::updateFrogPilotWidgets(QPainter &p) {
     signalImgVector.push_back(QPixmap(theme_path + "/turn_signal_1_red.png").transformed(QTransform().scale(-1, 1)));  // Flipped blindspot image
   }
 }
+// --------------------------------------------------
+// class Compass
+// Constructor
+Compass::Compass(QWidget *parent) : QWidget(parent), bearingDeg(0) {
+  // Load the outer compass image, set to the size of btn_size
+  compassOuterImg = loadPixmap("../frogpilot/assets/other_images/compass_outer.png", QSize(btn_size, btn_size));
 
-Compass::Compass(QWidget *parent) : QWidget(parent) {
-  setFixedSize(btn_size * 1.5, btn_size * 1.5);
+  // Set the widget size to the size of the outer compass image
+  setFixedSize(compassOuterImg.size());
 
-  compassSize = btn_size;
-  circleOffset = compassSize / 2;
-  degreeLabelOffset = circleOffset + 25;
-  innerCompass = compassSize / 2;
+  // Calculate the center coordinates of the widget
+  x = width() / 2;
+  y = height() / 2;
 
-  x = (btn_size * 1.5) / 2 + 20;
-  y = (btn_size * 1.5) / 2;
-
-  compassInnerImg = loadPixmap("../frogpilot/assets/other_images/compass_inner.png", QSize(compassSize / 1.75, compassSize / 1.75));
-
-  staticElements = QPixmap(size());
-  staticElements.fill(Qt::transparent);
-  QPainter p(&staticElements);
-
-  p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
-
-  // Configure the circles
-  QPen whitePen(Qt::white, 2);
-  p.setPen(whitePen);
-
-  // Draw the circle background and white inner circle
-  p.setOpacity(1.0);
-  p.setBrush(QColor(0, 0, 0, 100));
-  p.drawEllipse(x - circleOffset, y - circleOffset, circleOffset * 2, circleOffset * 2);
-
-  // Draw the white circles
-  p.setBrush(Qt::NoBrush);
-  p.drawEllipse(x - (innerCompass + 5), y - (innerCompass + 5), (innerCompass + 5) * 2, (innerCompass + 5) * 2);
-  p.drawEllipse(x - degreeLabelOffset, y - degreeLabelOffset, degreeLabelOffset * 2, degreeLabelOffset * 2);
-
-  // Draw the black background for the bearing degrees
-  QPainterPath outerCircle, innerCircle;
-  outerCircle.addEllipse(x - degreeLabelOffset, y - degreeLabelOffset, degreeLabelOffset * 2, degreeLabelOffset * 2);
-  innerCircle.addEllipse(x - circleOffset, y - circleOffset, compassSize, compassSize);
-  p.fillPath(outerCircle.subtracted(innerCircle), Qt::black);
-
-  // Draw the static degree lines
-  for (int i = 0; i < 360; i += 15) {
-    bool isCardinalDirection = i % 90 == 0;
-    int lineLength = isCardinalDirection ? 15 : 10;
-    p.setPen(QPen(Qt::white, isCardinalDirection ? 3 : 1));
-    p.save();
-    p.translate(x, y);
-    p.rotate(i);
-    p.drawLine(0, -(compassSize / 2 - lineLength), 0, -(compassSize / 2));
-    p.restore();
-  }
+  // Load the inner compass image (the needle) and scale it down to 75%
+  int innerSize = btn_size * 0.55; // % of btn_size
+  compassInnerImg = loadPixmap("../frogpilot/assets/other_images/compass_inner.png", QSize(innerSize, innerSize));
 }
-
 void Compass::updateState(int bearing_deg) {
   if (bearingDeg != bearing_deg) {
     update();
     bearingDeg = bearing_deg;
   }
 }
-
+// Paint event method
 void Compass::paintEvent(QPaintEvent *event) {
   QPainter p(this);
   p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
 
-  // Draw static elements
-  p.drawPixmap(0, 0, staticElements);
+  // Draw a semi-transparent black circle as background
+  QColor semiTransparentColor(0, 0, 0, 128); // Black with 50% opacity
+  p.setBrush(semiTransparentColor);
+  p.setPen(Qt::NoPen); // No border
+  p.drawEllipse(x - compassOuterImg.width() / 2, y - compassOuterImg.height() / 2, compassOuterImg.width(), compassOuterImg.height());
 
-  // Rotate and draw the compassInnerImg image
+  // Draw the outer compass image
+  p.drawPixmap((width() - compassOuterImg.width()) / 2, (height() - compassOuterImg.height()) / 2, compassOuterImg);
+
+  // Translate and rotate to draw the inner compass image
   p.translate(x, y);
   p.rotate(bearingDeg);
   p.drawPixmap(-compassInnerImg.width() / 2, -compassInnerImg.height() / 2, compassInnerImg);
   p.rotate(-bearingDeg);
   p.translate(-x, -y);
 
-  // Draw the bearing degree numbers
-  QFont font = InterFont(10, QFont::Normal);
-  for (int i = 0; i < 360; i += 15) {
-    bool isBold = abs(i - bearingDeg) <= 7;
-    font.setWeight(isBold ? QFont::Bold : QFont::Normal);
-    p.setFont(font);
-    p.setPen(QPen(Qt::white, i % 90 == 0 ? 2 : 1));
-
-    p.save();
-    p.translate(x, y);
-    p.rotate(i);
-    p.drawLine(0, -(compassSize / 2 - (i % 90 == 0 ? 12 : 8)), 0, -(compassSize / 2));
-    p.translate(0, -(compassSize / 2 + 12));
-    p.rotate(-i);
-    p.drawText(QRect(-20, -10, 40, 20), Qt::AlignCenter, QString::number(i));
-    p.restore();
-  }
-
-  // Draw cardinal directions
-  p.setFont(InterFont(20, QFont::Bold));
-  std::map<QString, std::tuple<QPair<float, float>, int, QColor>> directionInfo = {
-    {"N", {{292.5, 67.5}, Qt::AlignTop | Qt::AlignHCenter, Qt::white}},
-    {"E", {{22.5, 157.5}, Qt::AlignRight | Qt::AlignVCenter, Qt::white}},
-    {"S", {{112.5, 247.5}, Qt::AlignBottom | Qt::AlignHCenter, Qt::white}},
-    {"W", {{202.5, 337.5}, Qt::AlignLeft | Qt::AlignVCenter, Qt::white}}
-  };
-  int directionOffset = 20;
-
-  for (auto &item : directionInfo) {
-    QString direction = item.first;
-    auto &[range, alignmentFlag, color] = item.second;
-    auto &[minRange, maxRange] = range;
-
-    QRect textRect(x - innerCompass + directionOffset, y - innerCompass + directionOffset, innerCompass * 2 - 2 * directionOffset, innerCompass * 2 - 2 * directionOffset);
-
-    bool isInRange = false;
-    if (minRange > maxRange) {
-      isInRange = bearingDeg >= minRange || bearingDeg <= maxRange;
-    } else {
-      isInRange = bearingDeg >= minRange && bearingDeg <= maxRange;
-    }
-
-    p.setOpacity(isInRange ? 1.0 : 0.2);
-    p.setPen(QPen(color));
-    p.drawText(textRect, alignmentFlag, direction);
-  }
+  // Additional drawing code (e.g., for the bearing degree numbers and cardinal directions) should go here,
+  // taking care to adjust positions and sizes by multiplying by 0.75 where necessary.
 }
-
+// -----------------------------------------------------
 void AnnotatedCameraWidget::drawLeadInfo(QPainter &p) {
   // Declare the variables
   static QElapsedTimer timer;
@@ -1541,15 +1728,15 @@ void AnnotatedCameraWidget::drawLeadInfo(QPainter &p) {
 
   // Create segments for insights
   QString accelText = QString("Accel: %1%2")
-    .arg(currentAcceleration * accelerationConversion, 0, 'f', 2)
+    .arg(currentAcceleration * accelerationConversion, 0, 'f', 2, QChar('+'))
     .arg(accelerationUnit);
 
   QString maxAccSuffix = QString(mapOpen ? "" : " - Max: %1%2")
     .arg(maxAcceleration * accelerationConversion, 0, 'f', 2)
     .arg(accelerationUnit);
 
-  QString obstacleText = createText(mapOpen ? " | Obstacle: " : "  |  Obstacle Factor: ", obstacleDistance);
-  QString stopText = createText(mapOpen ? " - Stop: " : "  -  Stop Factor: ", scene.stopped_equivalence);
+  QString obstacleText = createText(mapOpen ? " | Obstacle: " : " | Obstacle Factor: ", obstacleDistance);
+  QString stopText = createText(mapOpen ? " - Stop: " : " - Stop Factor: ", scene.stopped_equivalence);
   QString followText = " = " + createText(mapOpen ? "Follow: " : "Follow Distance: ", scene.desired_follow);
 
   // Check if the longitudinal toggles have an impact on the driving logics
@@ -1560,15 +1747,44 @@ void AnnotatedCameraWidget::drawLeadInfo(QPainter &p) {
 
   // Prepare rectangle for insights
   p.save();
-  QRect insightsRect(rect().left() - 1, rect().top() - 60, rect().width() + 2, 100);
-  p.setBrush(QColor(0, 0, 0, 150));
-  p.drawRoundedRect(insightsRect, 30, 30);
-  p.setFont(InterFont(30, QFont::DemiBold));
+
+  // Create a QFont object for a monospaced font. This ensures that each character takes up the same amount of horizontal space.
+  // "Monospace" is the font family name. decimal is the font size, and QFont::Normal or QFont::DemiBold is the font weight.
+  QFont monospaceFont("Monospace", 19, QFont::Normal);
+
+  // Set the style hint to TypeWriter, which advises the rendering system to prefer monospaced fonts.
+  // This can help ensure that the font substitution (if "Monospace" is not available) still respects the monospaced requirement.
+  monospaceFont.setStyleHint(QFont::TypeWriter);
+
+  // Apply the QFont object to the QPainter. This changes the font used by QPainter for text rendering to our configured monospace font.
+  p.setFont(monospaceFont);
+
+  // Enable text antialiasing rendering hint for the QPainter.
+  // This makes the edges of the text smoother, which is especially useful for improving the readability of text at various sizes.
   p.setRenderHint(QPainter::TextAntialiasing);
 
-  // Calculate positioning for text drawing
+  // Define a rectangle that will be used for drawing the insights box.
+  // It starts 1 pixel left of the rect's left edge, 60 pixels above the top, extends 2 pixels wider than rect's width,
+  // and has a fixed height of 100 pixels. This rectangle serves as the background for the insights.
+  QRect insightsRect(rect().left() - 1, rect().top() - 60, rect().width() + 2, 100);
+
+  // Set the brush of QPainter to a semi-transparent black color (alpha value of 150 out of 255).
+  // This color will be used to fill shapes, including the rounded rectangle for the insights box.
+  p.setBrush(QColor(0, 0, 0, 150));
+
+  // Draw a rounded rectangle using the defined insightsRect as its boundary.
+  // The corner radius for both x and y directions is set to 30 pixels, giving it rounded corners.
+  p.drawRoundedRect(insightsRect, 30, 30);
+
+  // Calculate the positioning for the text drawing within the insights box.
+  // Adjusts the rectangle to create a margin for the text. The margins are added to the top and bottom (27 pixels each).
   QRect adjustedRect = insightsRect.adjusted(0, 27, 0, 27);
+
+  // Calculate the baseline for drawing text. This is done by finding the vertical center of the adjusted rectangle,
+  // then adjusting for the font's metrics to ensure text is vertically centered.
+  // p.fontMetrics().height() gives the height of the font. p.fontMetrics().descent() is subtracted to align the baseline correctly.
   int textBaseLine = adjustedRect.y() + (adjustedRect.height() + p.fontMetrics().height()) / 2 - p.fontMetrics().descent();
+
 
   // Calculate the entire text width to ensure perfect centering
   int totalTextWidth = p.fontMetrics().horizontalAdvance(accelText)
@@ -1596,26 +1812,123 @@ void AnnotatedCameraWidget::drawLeadInfo(QPainter &p) {
 
   p.restore();
 }
+// ==========================
+// BrakeDiscIcons Constructor
+BrakeDiscIcons::BrakeDiscIcons(UIState* ui_state, QWidget *parent)
+    : QWidget(parent), ui_state(ui_state) {
+    setFixedSize(btn_size, btn_size);
+    //ic_brake = loadPixmap("../frogpilot/assets/other_images/img_brake_disc.png", QSize(img_size, img_size));
+    ic_brake = loadPixmap("../frogpilot/assets/other_images/braking_lights.png", QSize(img_size, img_size));
+}
 
+void BrakeDiscIcons::paintEvent(QPaintEvent *event) {
+    QPainter p(this);
+    const auto car_state = (*ui_state->sm)["carState"].getCarState();
+    //bool brake_valid = car_state.getBrakePressed();
+    bool brake_valid = car_state.getBrakeLights();
+    float img_alpha = brake_valid ? 1.0f : 0.15f;
+    QColor bg_color = QColor(0, 0, 0, brake_valid ? 255 * 0.3f : 255 * 0.1f);
+    QPoint center = this->rect().center();
+    drawIcon(p, center, ic_brake, bg_color, img_alpha);
+}
+
+void BrakeDiscIcons::updateState() {
+  update(); // Trigger repaint
+}
+
+// ==========================
+// TIRE PRESSURE
+static const QColor get_tpms_color(float tpms) {
+    if(tpms < 5 || tpms > 60) // N/A
+        return QColor(255, 255, 255, 220);
+    if(tpms < 31)
+        return QColor(255, 90, 90, 220);
+    return QColor(255, 255, 255, 220);
+}
+static const QString get_tpms_text(float tpms) {
+    if(tpms < 5 || tpms > 60)
+        return "";
+
+    char str[32];
+    snprintf(str, sizeof(str), "%.0f", round(tpms));
+    return QString(str);
+}
+TirePressureIcons::TirePressureIcons(UIState* ui_state, QWidget *parent)
+    : QWidget(parent), ui_state(ui_state) {
+    setFixedSize(btn_size, btn_size);
+    ic_tire_pressure = loadPixmap("../frogpilot/assets/other_images/img_tire_pressure.png", QSize(img_size, img_size));
+}
+// AnnotatedCameraWidget::updateFrogPilotWidgets 에서
+// setVisible과 updateState를 call.
+void TirePressureIcons::updateState() {
+  update();
+}
+// Paint event handler for TirePressureIcons. This is called by the Qt framework to draw.
+void TirePressureIcons::paintEvent(QPaintEvent *event) {
+  QPainter p(this);
+  auto tpms = (*ui_state->sm)["carState"].getCarState().getTpms();
+
+  if (tpms.getEnabled()) {
+    int iconWidth = ic_tire_pressure.width();
+    int iconHeight = ic_tire_pressure.height();
+    QPoint iconCenter = this->rect().center();
+
+    p.setOpacity(0.8f);
+    p.drawPixmap(iconCenter.x() - iconWidth / 2, iconCenter.y() - iconHeight / 2, ic_tire_pressure);
+
+    p.setFont(InterFont(38, QFont::Bold));
+    QFontMetrics metrics(p.font());
+
+    const float fl = tpms.getFl();
+    const float fr = tpms.getFr();
+    const float rl = tpms.getRl();
+    const float rr = tpms.getRr();
+
+    // Increase xOffset for FL and RL to move them more to the left
+    int xOffsetFL_RL = iconWidth*5/4;
+    int xOffsetFR_RR = iconWidth/2;
+
+    int yOffset = iconHeight / 4;
+    //LEFT
+    QPoint flPos = iconCenter - QPoint(xOffsetFL_RL,  yOffset);
+    QPoint rlPos = iconCenter - QPoint(xOffsetFL_RL, -yOffset);
+    //RIGHT
+    QPoint frPos = iconCenter + QPoint(xOffsetFR_RR, -yOffset);
+    QPoint rrPos = iconCenter + QPoint(xOffsetFR_RR,  yOffset);
+
+    // Draw the text next to each wheel
+    p.setPen(get_tpms_color(fl));
+    p.drawText(flPos, get_tpms_text(fl));
+    p.setPen(get_tpms_color(fr));
+    p.drawText(frPos, get_tpms_text(fr));
+    p.setPen(get_tpms_color(rl));
+    p.drawText(rlPos, get_tpms_text(rl));
+    p.setPen(get_tpms_color(rr));
+    p.drawText(rrPos, get_tpms_text(rr));
+  }
+}
+
+// ==========================
+// PEDAL ICONS
 PedalIcons::PedalIcons(QWidget *parent) : QWidget(parent), scene(uiState()->scene) {
   setFixedSize(btn_size, btn_size);
 
   brake_pedal_img = loadPixmap("../frogpilot/assets/other_images/brake_pedal.png", QSize(img_size, img_size));
   gas_pedal_img = loadPixmap("../frogpilot/assets/other_images/gas_pedal.png", QSize(img_size, img_size));
 }
+constexpr float PIVOT_ACCEL = 0.25f;
+constexpr float PIVOT_DECEL = -0.25f;
 
 void PedalIcons::updateState() {
   acceleration = scene.acceleration;
 
-  accelerating = acceleration > 0.25;
-  decelerating = acceleration < -0.25;
+  accelerating = acceleration > PIVOT_ACCEL;
+  decelerating = acceleration < PIVOT_DECEL;
 
   if (accelerating || decelerating) {
     update();
   }
 }
-
-// MJ
 // Paint event handler for PedalIcons. This is called by the Qt framework to draw the pedal icons.
 void PedalIcons::paintEvent(QPaintEvent *event) {
   // QPainter is used for all drawing operations
@@ -1623,8 +1936,8 @@ void PedalIcons::paintEvent(QPaintEvent *event) {
   // Set antialiasing to true for smoother drawing
   p.setRenderHint(QPainter::Antialiasing);
 
-  // Increase the img_size by 50%
-  int newSize = img_size * 1.5;
+  // Increase the img_size
+  int newSize = img_size * 1.3;
 
   // Calculate the total width needed to draw both pedal icons side by side
   int totalWidth = 2 * newSize;
@@ -1636,19 +1949,8 @@ void PedalIcons::paintEvent(QPaintEvent *event) {
   // Calculate X coordinate for the gas pedal icon, placing it next to the brake
   int gasX = startX + newSize;
 
-  // To make the opacity more noticeable, increase the minimum opacity to a higher value,
-  // and adjust the scaling factor to increase the visibility of changes in acceleration.
-  // Here we change the minimum opacity to 0.5 and scale the dynamic part accordingly.
-  float minOpacity = 0.5f;
-  float maxOpacity = 1.0f;
-  float dynamicRange = maxOpacity - minOpacity; // Dynamic range for opacity changes.
-
-  // Adjust the opacity calculation:
-  // - Full opacity (1.0) when the car is at a standstill or when the acceleration changes are significant.
-  // - A more noticeable minimum opacity when there is no significant change in acceleration.
-  float brakeOpacity = scene.standstill ? maxOpacity : decelerating ? minOpacity + dynamicRange * std::min(std::abs(acceleration) / 0.60f, 1.0f) : minOpacity;
-  float gasOpacity = accelerating ? minOpacity + dynamicRange * std::min(acceleration / 0.25f, 1.0f) : minOpacity;
-
+  float brakeOpacity = scene.standstill ? 1.0f : decelerating ? std::max(0.25f, std::abs(acceleration)) : 0.25f;
+  float gasOpacity = accelerating ? std::max(0.25f, acceleration) : 0.25f;
 
   // Set the painter's opacity before drawing the brake pedal
   p.setOpacity(brakeOpacity);

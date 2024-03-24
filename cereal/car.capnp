@@ -267,6 +267,7 @@ struct CarState {
     speedOffset @3 :Float32;
     standstill @4 :Bool;
     nonAdaptive @5 :Bool;
+    gapAdjust @7 :Int8;
   }
 
   enum GearShifter {
@@ -303,9 +304,10 @@ struct CarState {
     }
   }
 
+  brakeLights @19 :Bool;
+
   # deprecated
   errorsDEPRECATED @0 :List(CarEvent.EventName);
-  brakeLightsDEPRECATED @19 :Bool;
   steeringRateLimitedDEPRECATED @29 :Bool;
   canMonoTimesDEPRECATED @12: List(UInt64);
 }
@@ -729,4 +731,12 @@ struct CarParams {
   brakeMaxVDEPRECATED @16 :List(Float32);
   directAccelControlDEPRECATED @30 :Bool;
   maxSteeringAngleDegDEPRECATED @54 :Float32;
+
+  sccBus @74: Int8;
+  hasAutoHold @75 :Bool;
+  hasScc13 @76 :Bool;
+  hasScc14 @77 :Bool;
+  hasEms @78 :Bool;
+  hasLfaHda @79 :Bool;
+  hasNav @80 :Bool;
 }

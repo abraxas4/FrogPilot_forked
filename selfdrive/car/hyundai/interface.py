@@ -314,6 +314,24 @@ class CarInterface(CarInterfaceBase):
       else:
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundai, 0)]
 
+      #
+      #ret.sccBus = 2 if (candidate in CAMERA_SCC_CAR or Params().get_bool('SccOnBus2')) else 0
+      ret.hasAutoHold = 1151 in fingerprint[0]
+      ret.hasLfaHda = 1157 in fingerprint[0]
+      ret.hasNav = 1348 in fingerprint[0]
+
+      if not ret.openpilotLongitudinalControl:
+        ret.radarUnavailable = ret.sccBus == -1
+
+      if ret.sccBus == 2:
+        ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
+        ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
+        ret.openpilotLongitudinalControl = True
+        ret.radarUnavailable = False
+        ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
+        ret.radarTimeStep = 0.02  # 50hz
+      #
+
       if candidate in CAMERA_SCC_CAR:
         ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
 

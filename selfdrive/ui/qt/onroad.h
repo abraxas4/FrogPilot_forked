@@ -18,6 +18,14 @@ const int img_size = (btn_size / 4) * 3;
 // FrogPilot global variables
 static double fps;
 
+
+// Inline functions for color convenience
+inline QColor greenColor(int alpha = 242) { return QColor(23, 134, 68, alpha); }
+inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); } // Returns a red color with the specified opacity.
+inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); } // Returns a white color with the specified opacity.
+inline QColor blackColor(int alpha = 255) { return QColor(0, 0, 0, alpha); } // Returns a black color with the specified opacity.
+inline QColor yellowColor(int alpha = 255) { return QColor(255, 255, 0, alpha); }
+
 // ***** onroad widgets *****
 class OnroadAlerts : public QWidget {
   Q_OBJECT
@@ -37,85 +45,7 @@ private:
   UIScene &scene;
 };
 // -----------------------------
-// class Compass
-class Compass : public QWidget {
-public:
-  explicit Compass(QWidget *parent = nullptr);
 
-  void updateState(int bearing_deg);
-
-protected:
-  void paintEvent(QPaintEvent *event) override;
-
-private:
-  int bearingDeg = 0; // Current bearing degree
-  QPixmap compassInnerImg; // Image for the inner compass (the needle)
-  QPixmap compassOuterImg; // Image for the outer compass (the static part)
-  int x, y; // Center coordinates of the compass
-};
-
-class ExperimentalButton : public QPushButton {
-  Q_OBJECT
-
-public:
-  explicit ExperimentalButton(QWidget *parent = 0);
-  void updateState(const UIState &s, bool leadInfo);
-
-private:
-  void paintEvent(QPaintEvent *event) override;
-  void changeMode();
-
-  Params params;
-  QPixmap engage_img;
-  QPixmap experimental_img;
-  bool experimental_mode;
-  bool engageable;
-
-  // FrogPilot variables
-  UIScene &scene;
-
-  std::map<int, QPixmap> wheelImages;
-
-  bool firefoxRandomEventTriggered;
-  bool rotatingWheel;
-  int steeringAngleDeg;
-  int wheelIcon;
-  int y_offset;
-};
-
-
-class MapSettingsButton : public QPushButton {
-  Q_OBJECT
-
-public:
-  explicit MapSettingsButton(QWidget *parent = 0);
-
-private:
-  void paintEvent(QPaintEvent *event) override;
-
-  QPixmap settings_img;
-};
-
-class PedalIcons : public QWidget {
-  Q_OBJECT
-
-public:
-  explicit PedalIcons(QWidget *parent = 0);
-  void updateState();
-
-private:
-  void paintEvent(QPaintEvent *event) override;
-
-  QPixmap brake_pedal_img;
-  QPixmap gas_pedal_img;
-
-  UIScene &scene;
-
-  bool accelerating;
-  bool decelerating;
-
-  float acceleration;
-};
 
 class BrakeDiscIcons : public QWidget {
     Q_OBJECT
@@ -148,6 +78,84 @@ private:
     UIState* ui_state;
 };
 
+class ExperimentalButton : public QPushButton {
+  Q_OBJECT
+
+public:
+  explicit ExperimentalButton(QWidget *parent = 0);
+  void updateState(bool leadInfo);
+
+private:
+  void paintEvent(QPaintEvent *event) override;
+  void changeMode();
+
+  Params params;
+  QPixmap engage_img;
+  QPixmap experimental_img;
+  bool experimental_mode;
+  bool engageable;
+
+  // FrogPilot variables
+  UIScene &scene;
+
+  std::map<int, QPixmap> wheelImages;
+
+  bool firefoxRandomEventTriggered;
+  bool rotatingWheel;
+  int steeringAngleDeg;
+  int wheelIcon;
+  int y_offset;
+};
+
+class PedalIcons : public QWidget {
+  Q_OBJECT
+
+public:
+  explicit PedalIcons(QWidget *parent = 0);
+  void updateState();
+
+private:
+  void paintEvent(QPaintEvent *event) override;
+
+  QPixmap brake_pedal_img;
+  QPixmap gas_pedal_img;
+
+  UIScene &scene;
+
+  bool accelerating;
+  bool decelerating;
+
+  float acceleration;
+};
+
+class MapSettingsButton : public QPushButton {
+  Q_OBJECT
+
+public:
+  explicit MapSettingsButton(QWidget *parent = 0);
+
+private:
+  void paintEvent(QPaintEvent *event) override;
+
+  QPixmap settings_img;
+};
+
+class Compass : public QWidget {
+public:
+  explicit Compass(QWidget *parent = nullptr);
+
+  void updateState(int bearing_deg);
+
+protected:
+  void paintEvent(QPaintEvent *event) override;
+
+private:
+  int bearingDeg = 0; // Current bearing degree
+  QPixmap compassInnerImg; // Image for the inner compass (the needle)
+  QPixmap compassOuterImg; // Image for the outer compass (the static part)
+  int x, y; // Center coordinates of the compass
+};
+
 class PersonalityButton : public QPushButton {
 public:
   explicit PersonalityButton(QWidget *parent = 0);
@@ -170,25 +178,53 @@ private:
 
   QVector<std::pair<QPixmap, QString>> profile_data;
 };
+class DriverFaceIcon : public QWidget {
+    Q_OBJECT
 
+  bool dmActive = false; // Flag for driver monitoring system activity
+  float dm_fade_state = 1.0; // Opacity state for driver monitoring fade effect
+  bool rightHandDM_ = false;
+
+public:
+    explicit DriverFaceIcon(UIState* ui_state, QWidget *parent = nullptr);
+    void updateState(bool rightHandDM);
+
+protected:
+    void paintEvent(QPaintEvent* event) override;
+
+private:
+    QPixmap ic_driver_face;
+    UIState* ui_state;
+    UIScene &scene;
+};
+
+// --------------------------------------------------
 // container window for the NVG UI
 class AnnotatedCameraWidget : public CameraWidget {
   Q_OBJECT
 
 public:
-  explicit AnnotatedCameraWidget(VisionStreamType type, QWidget* parent = 0);
+  explicit AnnotatedCameraWidget(VisionStreamType type, QWidget* parent = nullptr);
   void updateState(const UIState &s);
 
-  // Buttons to toggle map settings
+// Define a signal in your AnnotatedCameraWidget header file.
+signals:
+  void leadInfoUpdated(const QString &info); // Simplified signal
+
+public:
   MapSettingsButton *map_settings_btn;
-  MapSettingsButton *map_settings_btn_bottom;
-
-  static bool drawBorder;
-  static bool GetDrawBorder() { return drawBorder;}
-
 private:
-  QVBoxLayout *main_layout; // Main layout for UI elements
-  QHBoxLayout *bottom_layout; // Layout for bottom-aligned UI elements
+  QGridLayout* mainLayout;
+  QVBoxLayout* bottomLeftMainLayout; // New QVBoxLayout for the bottom left main layout
+  QHBoxLayout* bottomLeft1stFloorLayout;
+  QVBoxLayout* bottomRightLayout;
+  //std::map<QWidget*, QPair<int, int>> widgetPositions;
+
+  // Widgets for corners
+  QWidget *topLeftWidget; // Container for top-left corner widgets
+  QWidget *topRightWidget; // Container for top-right corner widgets
+  QWidget *bottomLeftWidget; // Container for bottom-left corner widgets
+  QWidget *bottomRightWidget; // Container for bottom-right corner widgets
 
   BrakeDiscIcons *brake_disc_icons; // BrakeDisc icon widgets
   TirePressureIcons *tire_pressure_icons; // TirePressure icon widgets
@@ -197,19 +233,18 @@ private:
   PedalIcons *pedal_icons; // Pedal icon widgets
   Compass *compass_img; // Compass widget
   PersonalityButton *personality_btn; // Button to toggle driving personality
+  DriverFaceIcon *driver_face_icon;
 
-  //
-  QPixmap dm_img; // Pixmap for driver monitoring image
+
   float speed; // Current vehicle speed
   QString speedUnit; // Unit of the speed (e.g., km/h or mph)
   float setSpeed; // Speed set by cruise control
   float speedLimit; // Speed limit detected or set by the system
   bool is_cruise_set = false; // Flag to indicate if cruise control is set
   bool is_metric = false; // Flag for metric system usage for units
-  bool dmActive = false; // Flag for driver monitoring system activity
+
   bool hideBottomIcons = false; // Flag to hide or show bottom icons
   bool rightHandDM = false; // Flag for right-hand drive configurations for DM
-  float dm_fade_state = 1.0; // Opacity state for driver monitoring fade effect
   bool has_us_speed_limit = false; // Flag for US speed limit detection
   bool has_eu_speed_limit = false; // Flag for EU speed limit detection
   bool v_ego_cluster_seen = false; // Flag indicating if ego vehicle's speed is shown in cluster
@@ -218,6 +253,9 @@ private:
 
   int skip_frame_count = 0; // Counter for skipped frames
   bool wide_cam_requested = false; // Flag to indicate if wide camera view is requested
+  
+  // Methods to position and resize widgets within the container widgets
+  void positionWidgets();
 
   // FrogPilot-specific UI initialization and update functions
   void initializeFrogPilotWidgets();
@@ -287,9 +325,6 @@ private:
 
   QTimer *animationTimer; // Timer to handle UI animations
 
-  // Inline functions to return QColor objects for different UI elements
-  inline QColor greenColor(int alpha = 242) { return QColor(23, 134, 68, alpha); }
-
 protected:
   // Overridden OpenGL functions for initializing and painting the OpenGL context
   void paintGL() override;
@@ -300,7 +335,6 @@ protected:
   void updateFrameMat() override; // Called to update the frame matrix for the camera view, possibly recalculating the projection if necessary.
   // Drawing functions for various UI components related to driving visualization
   void drawLaneLines(QPainter &painter, const UIState *s); // Draws lane lines on the UI based on the current state.
-  void drawDriverState(QPainter &painter, const UIState *s); // Draws visual elements related to driver monitoring state.
   void drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd); // Draws the lead vehicle information, including distance and speed.
   // Function to draw the entire heads-up display
   void drawHud(QPainter &p);
@@ -311,14 +345,8 @@ protected:
   // Additional private functions for drawing other components
   void drawHeaderGradient(QPainter &p);
   void drawCarStateOverlay(QPainter &p);
+  void updateWidgetAlignment(); // Method to update widget alignment dynamically
 
-
-
-  // Utility inline functions for commonly used colors within the UI.
-  inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); } // Returns a red color with the specified opacity.
-  inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); } // Returns a white color with the specified opacity.
-  inline QColor blackColor(int alpha = 255) { return QColor(0, 0, 0, alpha); } // Returns a black color with the specified opacity.
-  inline QColor yellowColor(int alpha = 255) { return QColor(255, 255, 0, alpha); }
 
   double prev_draw_t = 0; // Holds the previous draw time; useful for calculating frame rates or animation intervals.
   FirstOrderFilter fps_filter; // A filter for smoothing out the frame-per-second calculations.
@@ -344,6 +372,7 @@ private:
   QColor bg = bg_colors[STATUS_DISENGAGED];
   QWidget *map = nullptr;
   QHBoxLayout* split;
+  QString leadInfoLog; // To store the latest log information
 
   // FrogPilot widgets
   void updateFPSCounter();
@@ -363,4 +392,5 @@ private slots:
   void offroadTransition(bool offroad);
   void primeChanged(bool prime);
   void updateState(const UIState &s);
+  void handleLeadInfo(const QString &info);
 };

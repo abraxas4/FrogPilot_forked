@@ -14,39 +14,60 @@
 #include "selfdrive/ui/qt/maps/map_settings.h"
 #endif
 
+// =======================================
 // HomeWindow: the container for the offroad and onroad UIs
 
+// HomeWindow is likely the top-level widget that contains all other widgets like sidebar, onroad/offroad views, etc.
 HomeWindow::HomeWindow(QWidget* parent) : QWidget(parent) {
+  // Main layout is horizontal, meaning widgets will be placed side by side
   QHBoxLayout *main_layout = new QHBoxLayout(this);
-  main_layout->setMargin(0);
-  main_layout->setSpacing(0);
+  main_layout->setMargin(0); // No margins for the layout, widgets will occupy the full space available
+  main_layout->setSpacing(0); // No spacing between widgets, they will be adjacent to each other
 
+  // Initialize the sidebar widget and add it to the main layout
   sidebar = new Sidebar(this);
   main_layout->addWidget(sidebar);
+  // Connect a signal emitted by the sidebar (likely when a button is clicked) to a slot in this window
   QObject::connect(sidebar, &Sidebar::openSettings, this, &HomeWindow::openSettings);
 
+  // Stack layout allows stacking widgets on top of each other, showing one at a time
   slayout = new QStackedLayout();
+  // Add the stacked layout to the horizontal layout next to the sidebar
   main_layout->addLayout(slayout);
 
+  // The home widget is the offroad home screen and is added to the stack layout
   home = new OffroadHome(this);
+  // Connect a signal to open settings from the offroad home screen
   QObject::connect(home, &OffroadHome::openSettings, this, &HomeWindow::openSettings);
+  // Add the home widget to the stack layout
   slayout->addWidget(home);
 
+  // The onroad widget is the driving interface and is added to the stack layout
   onroad = new OnroadWindow(this);
+  // When the map panel is requested to be opened in the onroad window, hide the sidebar
   QObject::connect(onroad, &OnroadWindow::mapPanelRequested, this, [=] { sidebar->hide(); });
+  // Add the onroad widget to the stack layout
   slayout->addWidget(onroad);
 
+  // The body widget is another screen, possibly for additional settings or information, added to the stack layout
   body = new BodyWindow(this);
   slayout->addWidget(body);
 
+  // The driver_view widget shows the driver's view camera feed and is added to the stack layout
   driver_view = new DriverViewWindow(this);
-  connect(driver_view, &DriverViewWindow::done, [=] {
-    showDriverView(false);
+  // When done with the driver view, switch back to the previous screen
+  connect(driver_view, &DriverViewWindow::done, [=] { 
+    showDriverView(false); 
   });
   slayout->addWidget(driver_view);
+
+  // Indicates that the window's background is provided by the system, no need to paint it
   setAttribute(Qt::WA_NoSystemBackground);
+
+  // Connect various UI state update signals to the respective slots in this window
   QObject::connect(uiState(), &UIState::uiUpdate, this, &HomeWindow::updateState);
   QObject::connect(uiState(), &UIState::offroadTransition, this, &HomeWindow::offroadTransition);
+  // Ensure the sidebar is aware of the offroad transition state
   QObject::connect(uiState(), &UIState::offroadTransition, sidebar, &Sidebar::offroadTransition);
 }
 
@@ -109,6 +130,7 @@ void HomeWindow::mouseDoubleClickEvent(QMouseEvent* e) {
   }
 }
 
+// =======================================
 // OffroadHome: the offroad home page
 
 OffroadHome::OffroadHome(QWidget* parent) : QFrame(parent) {

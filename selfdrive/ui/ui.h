@@ -20,6 +20,9 @@
 
 const int UI_BORDER_SIZE = 30;
 const int UI_HEADER_HEIGHT = 420;
+const int UI_CAM_WIDGET_MARGIN = 5;
+const int UI_SPEEDLIMIT_WIDTH_METRIC = 200;
+const int UI_SPEEDLIMIT_WIDTH_ETC = 223;
 
 const int UI_FREQ = 20; // Hz
 const int BACKLIGHT_OFFROAD = 50;

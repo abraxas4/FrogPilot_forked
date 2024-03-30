@@ -1933,7 +1933,8 @@ void ExperimentalButton::updateState(bool leadInfo) {
   rotatingWheel = scene.rotating_wheel;
   wheelIcon = scene.wheel_icon;
 
-  y_offset = leadInfo ? 10 : 0;
+  y_offset = 0;
+  //y_offset = leadInfo ? 10 : 0;
 
   if (firefoxRandomEventTriggered) {
     static int rotationDegree = 0;

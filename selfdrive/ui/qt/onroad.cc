@@ -283,7 +283,7 @@ void OnroadWindow::paintEvent(QPaintEvent *event) {
   // Here, rect() would return the rectangle that covers the entire OnroadWindow widget.
   p.fillRect(rect(), QColor(bg.red(), bg.green(), bg.blue(), 255));
 
-  QFont monospaceFont("Monospace", 20, QFont::DemiBold); // Adjust size as necessary
+  QFont monospaceFont("Monospace", 22, QFont::DemiBold); // Adjust size as necessary
   monospaceFont.setStyleHint(QFont::TypeWriter);
   p.setFont(monospaceFont);
   p.setRenderHint(QPainter::TextAntialiasing);
@@ -319,8 +319,19 @@ void OnroadWindow::paintEvent(QPaintEvent *event) {
   }
   // Draw the leadInfoLog at the top of the window --------------------------------------
   if (!leadInfoLog.isEmpty()) {
-    monospaceFont.setStretch(/*80*/QFont::Condensed); // Make the font more condensed
-    p.setFont(monospaceFont);
+    //monospaceFont.setStretch(/*80*/QFont::SemiCondensed); // Make the font more condensed
+    #if 0
+    QFont::UltraCondensed: 50%
+    QFont::ExtraCondensed: 62.5%
+    QFont::Condensed: 75%
+    QFont::SemiCondensed: 87.5%
+    QFont::Unstretched: 100% (the default width)
+    QFont::SemiExpanded: 112.5%
+    QFont::Expanded: 125%
+    QFont::ExtraExpanded: 150%
+    QFont::UltraExpanded: 200%
+    #endif
+    //p.setFont(monospaceFont);
     int yPosTop = currentRect.top() + UI_BORDER_SIZE - (UI_BORDER_SIZE - textHeight)/2; // Position the text below the top edge
     // Draw the lead info log (signal : leadInfoUpdated)
     p.drawText(leftMargin, yPosTop, leadInfoLog); // Y : where the baseline of the text begins
@@ -1612,14 +1623,14 @@ void AnnotatedCameraWidget::drawLeadInfo(QPainter &p) {
   QString accelText = QString("Accel: %1%2")
     .arg(currentAcceleration * accelerationConversion, 0, 'f', 2, QChar('+'))
     .arg(accelerationUnit);
-
-  QString maxAccSuffix = QString(mapOpen ? "" : " - Max: %1%2")
+  bool bNarrow = true;
+  QString maxAccSuffix = QString(bNarrow ? "" : " - Max: %1%2")
     .arg(maxAcceleration * accelerationConversion, 0, 'f', 2)
     .arg(accelerationUnit);
 
-  QString obstacleText = createText(mapOpen ? " | Obstacle: " : " | Obstacle Factor: ", obstacleDistance);
-  QString stopText = createText(mapOpen ? " - Stop: " : " - Stop Factor: ", scene.stopped_equivalence);
-  QString followText = " = " + createText(mapOpen ? "Follow: " : "Follow Distance: ", scene.desired_follow);
+  QString obstacleText = createText(bNarrow ? " | Obstacle: " : " | Obstacle Factor: ", obstacleDistance);
+  QString stopText = createText(bNarrow ? " - Stop: " : " - Stop Factor: ", scene.stopped_equivalence);
+  QString followText = " = " + createText(bNarrow ? "Follow: " : "Follow Distance: ", scene.desired_follow);
 
   // ----------------------------------------------------------------------------------------------------------------
   // This lambda function, 'createDiffText', is designed to create a string that represents the difference 

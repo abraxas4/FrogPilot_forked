@@ -69,11 +69,19 @@ class CarState(CarStateBase):
       speed_limit = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
       return speed_limit if speed_limit not in (0, 255) else 0
 
-  # call : CS.update
+  '''
+  call from
+  selfdrive\car\hyundai\interface.py
+    class CarInterface(CarInterfaceBase):
+      def _update(self, c, frogpilot_variables):
+        ret = self.CS.update(self.cp, self.cp_cam, frogpilot_variables)
+  '''
   def update(self, cp, cp_cam, frogpilot_variables):
     if self.CP.carFingerprint in CANFD_CAR:
       return self.update_canfd(cp, cp_cam, frogpilot_variables)
 
+    # initializes a new instance of the CarState message structure as defined in the Cap'n Proto schema
+    # "car" is define in cereal\__init__.py
     ret = car.CarState.new_message()
     cp_cruise = cp_cam if self.CP.carFingerprint in CAMERA_SCC_CAR else cp
     self.is_metric = cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"] == 0

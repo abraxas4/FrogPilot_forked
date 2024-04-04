@@ -161,6 +161,7 @@ class CarD:
 
     # Prepare a new 'carState' message. This message contains the current state of the car,
     # including all relevant sensor data and any events that might affect driving behavior.
+    # The Openpilot software uses ZeroMQ for messaging between processes. 
     cs_send = messaging.new_message('carState')
     cs_send.valid = self.CS.canValid  # Set the validity of the message based on the car state's validity.
     cs_send.carState = self.CS  # Attach the current car state.

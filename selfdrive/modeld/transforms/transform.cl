@@ -1,3 +1,13 @@
+// This code is an OpenCL kernel for applying a perspective warp transformation to an image, 
+// interpolating pixel values based on a given transformation matrix.
+#if 0
+워프 변환(warp transformation)은 이미지의 픽셀 위치를 재배치하여 이미지의 모양을 변형시키는 과정입니다. 
+이 변환을 통해 이미지에 대한 시점 변경, 물체의 변형, 혹은 다양한 효과를 적용할 수 있습니다. 
+특히, 워프 변환 중 하나인 투시 워프 변환(perspective warp transformation)은 
+이미지에 3차원적인 효과를 주어 물체가 공간에서 어떻게 위치하고 있는지를 변형시키는 데 사용됩니다. 
+이를 통해 이미지를 마치 다른 각도에서 본 것처럼 만들거나, 물체를 다른 모양으로 변형시키는 등의 효과를 줄 수 있습니다. 
+예를 들어, 건물의 사진을 마치 공중에서 내려다보는 시점으로 변형시키거나, 도로의 사진을 더욱 깊이 있게 보이게 하는 등의 작업이 가능합니다.
+#endif
 // Define constants for interpolation bits, table size, and scale factor
 #define INTER_BITS 5
 #define INTER_TAB_SIZE (1 << INTER_BITS)

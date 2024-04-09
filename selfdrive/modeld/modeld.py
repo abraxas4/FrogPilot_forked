@@ -46,18 +46,28 @@ class FrameMeta:
     if vipc is not None:
       self.frame_id, self.timestamp_sof, self.timestamp_eof = vipc.frame_id, vipc.timestamp_sof, vipc.timestamp_eof
 
+# Class to manage the model's state including inputs, outputs, and frames
 class ModelState:
+  # ModelFrame instances for regular and wide angle processing
   frame: ModelFrame
   wide_frame: ModelFrame
+  # Dictionary to hold input arrays for the neural network
   inputs: Dict[str, np.ndarray]
+  # Numpy array to hold the output predictions from the model
   output: np.ndarray
+  # Previous desire state array to track transitions
   prev_desire: np.ndarray  # for tracking the rising edge of the pulse
+  # ModelRunner object to manage the execution of the neural network
   model: ModelRunner
 
+  # Constructor of the ModelState class
   def __init__(self, context: CLContext):
+    # Initialize regular and wide angle frames
     self.frame = ModelFrame(context)
     self.wide_frame = ModelFrame(context)
+    # Set up initial state for previous desires as zeros
     self.prev_desire = np.zeros(ModelConstants.DESIRE_LEN, dtype=np.float32)
+    # Define and initialize all input arrays for the model with zeros
     self.inputs = {
       'desire': np.zeros(ModelConstants.DESIRE_LEN * (ModelConstants.HISTORY_BUFFER_LEN+1), dtype=np.float32),
       'traffic_convention': np.zeros(ModelConstants.TRAFFIC_CONVENTION_LEN, dtype=np.float32),
@@ -68,54 +78,80 @@ class ModelState:
       'features_buffer': np.zeros(ModelConstants.HISTORY_BUFFER_LEN * ModelConstants.FEATURE_LEN, dtype=np.float32),
     }
 
+    # Load model metadata from the predefined metadata path
     with open(METADATA_PATH, 'rb') as f:
       model_metadata = pickle.load(f)
 
+    # Extract the slices of the model output for parsing
     self.output_slices = model_metadata['output_slices']
+    # Determine the output size from the model metadata
     net_output_size = model_metadata['output_shapes']['outputs'][1]
+    # Initialize the output array to hold model predictions
     self.output = np.zeros(net_output_size, dtype=np.float32)
+    # Create a parser instance to handle output data
     self.parser = Parser()
 
+    # Set up the model runner with paths and context
     self.model = ModelRunner(MODEL_PATHS, self.output, Runtime.GPU, False, context)
+    # Prepare the model inputs for image data
     self.model.addInput("input_imgs", None)
     self.model.addInput("big_input_imgs", None)
-    for k,v in self.inputs.items():
+    # Prepare all other model inputs
+    for k, v in self.inputs.items():
       self.model.addInput(k, v)
 
+  # Function to slice model outputs into a structured format for further processing
   def slice_outputs(self, model_outputs: np.ndarray) -> Dict[str, np.ndarray]:
-    parsed_model_outputs = {k: model_outputs[np.newaxis, v] for k,v in self.output_slices.items()}
+    # Parse model outputs according to the slices defined in the metadata
+    parsed_model_outputs = {k: model_outputs[np.newaxis, v] for k, v in self.output_slices.items()}
+    # If configured, add the raw model predictions to the parsed outputs
     if SEND_RAW_PRED:
       parsed_model_outputs['raw_pred'] = model_outputs.copy()
+    # Return the structured model outputs
     return parsed_model_outputs
 
+  # Function to run the model for a given set of inputs and provide the outputs
   def run(self, buf: VisionBuf, wbuf: VisionBuf, transform: np.ndarray, transform_wide: np.ndarray,
                 inputs: Dict[str, np.ndarray], prepare_only: bool) -> Optional[Dict[str, np.ndarray]]:
     # Model decides when action is completed, so desire input is just a pulse triggered on rising edge
+    # Set the first desire input to zero as a pulse trigger on rising edge
     inputs['desire'][0] = 0
+    # Shift the desire inputs to prepare for the next model run
     self.inputs['desire'][:-ModelConstants.DESIRE_LEN] = self.inputs['desire'][ModelConstants.DESIRE_LEN:]
+    # Update the last desire inputs based on rising edge detection
     self.inputs['desire'][-ModelConstants.DESIRE_LEN:] = np.where(inputs['desire'] - self.prev_desire > .99, inputs['desire'], 0)
+    # Remember the last desire input for the next run
     self.prev_desire[:] = inputs['desire']
 
+    # Update the inputs with the current traffic convention, lateral control params, and navigational features
     self.inputs['traffic_convention'][:] = inputs['traffic_convention']
     self.inputs['lateral_control_params'][:] = inputs['lateral_control_params']
     self.inputs['nav_features'][:] = inputs['nav_features']
     self.inputs['nav_instructions'][:] = inputs['nav_instructions']
 
     # if getCLBuffer is not None, frame will be None
+    # Prepare the input images buffer for the model
     self.model.setInputBuffer("input_imgs", self.frame.prepare(buf, transform.flatten(), self.model.getCLBuffer("input_imgs")))
+    # Prepare the wide angle input images buffer if a wide buffer is provided
     if wbuf is not None:
       self.model.setInputBuffer("big_input_imgs", self.wide_frame.prepare(wbuf, transform_wide.flatten(), self.model.getCLBuffer("big_input_imgs")))
 
+    # If only preparing the model inputs, return here without executing the model
     if prepare_only:
       return None
 
+    # Execute the model with the prepared inputs
     self.model.execute()
+    # Parse and slice the outputs from the model execution
     outputs = self.parser.parse_outputs(self.slice_outputs(self.output))
 
+    # Update the feature buffer with the latest hidden state from the model outputs
     self.inputs['features_buffer'][:-ModelConstants.FEATURE_LEN] = self.inputs['features_buffer'][ModelConstants.FEATURE_LEN:]
     self.inputs['features_buffer'][-ModelConstants.FEATURE_LEN:] = outputs['hidden_state'][0, :]
+    # Update the previous desired curvature buffer with the model's desired curvature output
     self.inputs['prev_desired_curv'][:-ModelConstants.PREV_DESIRED_CURV_LEN] = self.inputs['prev_desired_curv'][ModelConstants.PREV_DESIRED_CURV_LEN:]
     self.inputs['prev_desired_curv'][-ModelConstants.PREV_DESIRED_CURV_LEN:] = outputs['desired_curvature'][0, :]
+    # Return the final parsed outputs for use elsewhere in the system
     return outputs
 
 

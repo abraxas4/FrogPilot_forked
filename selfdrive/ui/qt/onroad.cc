@@ -1240,53 +1240,80 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   painter.restore();
 }
 
-
+// This function is used to draw the lead vehicle indicator on the QPainter canvas
 void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd) {
+  // Save the current state of the painter to preserve settings for future paint operations
   painter.save();
 
+  // Determine the buffer for speed, affecting visibility of chevron based on the theme
   const float speedBuff = customColors ? 25. : 10.;  // Make the center of the chevron appear sooner if a custom theme is active
+  // Determine the buffer for lead distance, affecting visibility of chevron based on the theme
   const float leadBuff = customColors ? 100. : 40.;  // Make the center of the chevron appear sooner if a custom theme is active
+  // Get the relative distance from the radar data
   const float d_rel = lead_data.getDRel();
+  // Get the relative speed from the radar data
   const float v_rel = lead_data.getVRel();
 
+  // Initialize the alpha value for the chevron fill color
   float fillAlpha = 0;
+  // Calculate the alpha for fill color based on relative distance to the lead vehicle
   if (d_rel < leadBuff) {
+    // Increase the alpha as the vehicle gets closer within the lead buffer
     fillAlpha = 255 * (1.0 - (d_rel / leadBuff));
+    // Further increase the alpha if the relative speed is negative (approaching)
     if (v_rel < 0) {
+      // Increase the alpha based on the speed buffer when the lead car is approaching
       fillAlpha += 255 * (-1 * (v_rel / speedBuff));
     }
+    // Clamp the alpha value to a maximum of 255 to ensure it stays within valid color value range
     fillAlpha = (int)(fmin(fillAlpha, 255));
   }
 
+  // Calculate the size of the chevron based on relative distance, clamping to a minimum and maximum size
   float sz = std::clamp((25 * 30) / (d_rel / 3 + 30), 15.0f, 30.0f) * 2.35;
+  // Clamp the x position of the chevron to stay within the widget's width boundaries
   float x = std::clamp((float)vd.x(), 0.f, width() - sz / 2);
+  // Set the y position of the chevron, ensuring it's not drawn below the bottom of the widget
   float y = std::fmin(height() - sz * .6, (float)vd.y());
 
+  // Calculate offsets for drawing the glow effect
   float g_xo = sz / 5;
   float g_yo = sz / 10;
 
+  // Define the points for drawing the glow effect around the chevron
   QPointF glow[] = {{x + (sz * 1.35) + g_xo, y + sz + g_yo}, {x, y - g_yo}, {x - (sz * 1.35) - g_xo, y + sz + g_yo}};
+  // Set the brush color for the glow effect
   painter.setBrush(QColor(218, 202, 37, 255));
+  // Draw the glow effect as a polygon behind the chevron
   painter.drawPolygon(glow, std::size(glow));
 
   // chevron
+  // Define the points for the chevron shape
   QPointF chevron[] = {{x + (sz * 1.25), y + sz}, {x, y}, {x - (sz * 1.25), y + sz}};
+  // Set the brush color for the chevron based on custom theme settings
   if (customColors != 0) {
+    // Use the color from the theme configuration if custom colors are enabled
     painter.setBrush(std::get<3>(themeConfiguration[customColors]).begin()->second);
   } else {
+    // Use a standard red color with calculated transparency if custom colors are not enabled
     painter.setBrush(redColor(fillAlpha));
   }
+  // Draw the chevron shape on the canvas
   painter.drawPolygon(chevron, std::size(chevron));
 
   // Add lead info
+  // Check if lead vehicle info should be added to the indicator
   if (leadInfo) {
     // Declare the variables
+    // Calculate the speed of the lead vehicle, ensuring it does not go below zero
     float lead_speed = std::max(lead_data.getVLead(), 0.0f);  // Ensure lead speed doesn't go under 0 m/s cause that's dumb
 
     // Form the text and center it below the chevron
+    // Set the pen color and font for the lead vehicle info text
     painter.setPen(Qt::white);
     painter.setFont(InterFont(35, QFont::Bold));
 
+    // Compose the lead vehicle info text with distance and speed
     QString text = QString("%1 %2 | %3 %4")
                            .arg(qRound(d_rel * distanceConversion))
                            .arg(leadDistanceUnit)
@@ -1294,14 +1321,18 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
                            .arg(leadSpeedUnit);
 
     // Calculate the text starting position
+    // Calculate the metrics for the text to centralize it below the chevron
     QFontMetrics metrics(painter.font());
     int middle_x = (chevron[2].x() + chevron[0].x()) / 2;
     int textWidth = metrics.horizontalAdvance(text);
+    // Draw the lead vehicle info text below the chevron
     painter.drawText(middle_x - textWidth / 2, chevron[0].y() + metrics.height() + 5, text);
   }
 
+  // Restore the painter state to what it was before drawing the lead vehicle indicator
   painter.restore();
 }
+
 
 void AnnotatedCameraWidget::paintGL() {
 }

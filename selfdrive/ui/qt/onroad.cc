@@ -1336,73 +1336,110 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
 
 void AnnotatedCameraWidget::paintGL() {
 }
-
+// The paintEvent function is called by the Qt framework to update the widget's appearance
 void AnnotatedCameraWidget::paintEvent(QPaintEvent *event) {
+  // Retrieve the UI state object that contains various state information
   UIState *s = uiState();
+  // Create a SubMaster instance for receiving data from other processes
   SubMaster &sm = *(s->sm);
+  // Create a QPainter object for drawing on the widget
   QPainter painter(this);
+  // Get the current time since boot for performance measurement
   const double start_draw_t = millis_since_boot();
+  // Retrieve the latest model data from the messaging framework
   const cereal::ModelDataV2::Reader &model = sm["modelV2"].getModelV2();
 
   // draw camera frame
+  // Block to draw the camera frame
   {
+    // Acquire the lock to safely access the frames buffer
     std::lock_guard lk(frame_lock);
 
+    // Check if there are any frames to draw, skip drawing if not ready yet
     if (frames.empty()) {
+      // Count down the number of frames to skip if there are any pending
       if (skip_frame_count > 0) {
         skip_frame_count--;
         qDebug() << "skipping frame, not ready";
+        // Exit the function early if we're skipping the frame
         return;
       }
     } else {
       // skip drawing up to this many frames if we're
       // missing camera frames. this smooths out the
       // transitions from the narrow and wide cameras
+
+      // Reset the skip frame count after drawing a frame successfully
       skip_frame_count = 5;
     }
 
     // Wide or narrow cam dependent on speed
+    // Determine whether to use the wide or narrow camera based on the vehicle's speed
     bool has_wide_cam = available_streams.count(VISION_STREAM_WIDE_ROAD);
+    // Camera switching logic based on vehicle speed and available camera streams
     if (has_wide_cam && cameraView == 0) {
+      // Retrieve the vehicle's speed from the car state message
       float v_ego = sm["carState"].getCarState().getVEgo();
+      // Decide whether to request the wide camera based on vehicle speed
       if ((v_ego < 10) || available_streams.size() == 1) {
         wide_cam_requested = true;
       } else if (v_ego > 15) {
         wide_cam_requested = false;
       }
+      // Check if the controls are in experimental mode before switching to the wide camera
       wide_cam_requested = wide_cam_requested && sm["controlsState"].getControlsState().getExperimentalMode();
       // for replay of old routes, never go to widecam
+      // Avoid switching to the wide camera during replay of old routes
       wide_cam_requested = wide_cam_requested && s->scene.calibration_wide_valid;
     }
+    // Set the stream type for the CameraWidget based on the determined camera to use
     CameraWidget::setStreamType(cameraView == 3 || showDriverCamera ? VISION_STREAM_DRIVER :
                                 cameraView == 2 || wide_cam_requested ? VISION_STREAM_WIDE_ROAD :
                                 VISION_STREAM_ROAD);
 
+    // Update the scene object with whether we're currently using the wide camera
     s->scene.wide_cam = CameraWidget::getStreamType() == VISION_STREAM_WIDE_ROAD;
+    // Update the calibration for the CameraWidget based on current calibration data
     if (s->scene.calibration_valid) {
+      // Choose calibration based on whether we're using the wide camera
       auto calib = s->scene.wide_cam ? s->scene.view_from_wide_calib : s->scene.view_from_calib;
       CameraWidget::updateCalibration(calib);
     } else {
+      // Use default calibration if no valid calibration is available
       CameraWidget::updateCalibration(DEFAULT_CALIBRATION);
     }
+    // Begin native painting to use OpenGL for rendering the camera frame
     painter.beginNativePainting();
+    // Set the frame ID for the CameraWidget based on the model's frame ID
     CameraWidget::setFrameId(model.getFrameId());
+    // Use OpenGL to draw the camera frame
     CameraWidget::paintGL();
+    // End native painting as we switch back to QPainter
     painter.endNativePainting();
   }
 
+  // Enable anti-aliasing for smoother drawing
   painter.setRenderHint(QPainter::Antialiasing);
+  // Disable the pen as no outlines will be drawn
   painter.setPen(Qt::NoPen);
 
+  // Draw the world objects and lane lines if they're enabled and the driver camera is not showing
   if (s->scene.world_objects_visible && !showDriverCamera) {
+    // Update the model for the UI state
     update_model(s, model, sm["uiPlan"].getUiPlan());
+    // Draw lane lines on the QPainter canvas
     drawLaneLines(painter, s);
 
+    // Draw lead vehicle indicators if longitudinal control is enabled and radar data is available
     if (s->scene.longitudinal_control && sm.rcv_frame("radarState") > s->scene.started_frame) {
+      // Get radar state information
       auto radar_state = sm["radarState"].getRadarState();
+      // Update the lead vehicle positions based on radar and model data
       update_leads(s, radar_state, model.getPosition());
+      // Retrieve information about the first and second lead vehicles
       auto lead_one = radar_state.getLeadOne();
       auto lead_two = radar_state.getLeadTwo();
+      // Draw the lead vehicle indicators if they're detected and sufficiently spaced apart
       if (lead_one.getStatus()) {
         drawLead(painter, lead_one, s->scene.lead_vertices[0]);
       }
@@ -1411,35 +1448,53 @@ void AnnotatedCameraWidget::paintEvent(QPaintEvent *event) {
       }
     }
   }
+  // Update the flag indicating if the driver monitoring system detected a right-hand driver
   rightHandDM = sm["driverMonitoringState"].getDriverMonitoringState().getIsRHD();
 
   // DMoji
+  // Draw the Driver Monitoring emoji or the driver state
   #if 1
+  // Show the driver face icon if the bottom icons are not hidden and driver state data is recent
   driver_face_icon->setVisible(!hideBottomIcons && (sm.rcv_frame("driverStateV2") > s->scene.started_frame));
+  // Update the driver face icon based on whether the driver is on the right-hand side
   driver_face_icon->updateState(rightHandDM);
   #else
+  // Update and draw the driver state if bottom icons are visible and driver state data is recent
   if (!hideBottomIcons && (sm.rcv_frame("driverStateV2") > s->scene.started_frame)) {
+    // Update driver monitoring data
     update_dmonitoring(s, sm["driverStateV2"].getDriverStateV2(), dm_fade_state, rightHandDM);  // /selfdrive/ui.h
+    // Draw the driver state on the canvas
     drawDriverState(painter, s);
   }
   #endif
+  // Draw the heads-up display (HUD)
   drawHud(painter);
 
+  // Get the current time to measure the drawing performance
   double cur_draw_t = millis_since_boot();
+  // Calculate the time difference from the previous draw call
   double dt = cur_draw_t - prev_draw_t;
+  // Update frames per second (fps) using a filter for smooth changes
   fps = fps_filter.update(1. / dt * 1000);
+  // Log a warning if the frame rate is below a threshold
   if (fps < 15) {
     LOGW("slow frame rate: %.2f fps", fps);
   }
+  // Store the current time for the next draw call comparison
   prev_draw_t = cur_draw_t;
 
   // publish debug msg
+  // Construct a message to publish debug information
   MessageBuilder msg;
+  // Initialize a new event for UI debugging
   auto m = msg.initEvent().initUiDebug();
+  // Set the time taken for drawing operations in the message
   m.setDrawTimeMillis(cur_draw_t - start_draw_t);
+  // Send the debug message over the messaging framework
   pm->send("uiDebug", msg);
 
   // Update FrogPilot widgets
+  // Call a function to update any widgets related to FrogPilot
   updateFrogPilotWidgets(painter);
 }
 

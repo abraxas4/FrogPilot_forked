@@ -17,41 +17,78 @@
 
 // Projects a point in car to space to the corresponding point in full frame
 // image space.
+// This function projects a point from the car's coordinate space to the full frame image space.
+// `in_x`, `in_y`, `in_z` are the coordinates of the point in the car's coordinate space.
+// `out` is the projected point in the image space.
 static bool calib_frame_to_full_frame(const UIState *s, float in_x, float in_y, float in_z, QPointF *out) {
+  // Set a margin for clipping the region to avoid drawing outside the screen boundaries.
   const float margin = 500.0f;
   const QRectF clip_region{-margin, -margin, s->fb_w + 2 * margin, s->fb_h + 2 * margin};
 
+  // Convert input point to a homogeneous coordinate vector.
   const vec3 pt = (vec3){{in_x, in_y, in_z}};
+  
+  // Apply the extrinsic transformation matrix to the point, which accounts for the camera's position and orientation.
   const vec3 Ep = matvecmul3(s->scene.wide_cam ? s->scene.view_from_wide_calib : s->scene.view_from_calib, pt);
+  
+  // Apply the intrinsic camera matrix to transform the extrinsically transformed point to image space.
   const vec3 KEp = matvecmul3(s->scene.wide_cam ? ECAM_INTRINSIC_MATRIX : FCAM_INTRINSIC_MATRIX, Ep);
 
   // Project.
+  // Project the point onto the image plane by dividing by the z-component and apply the car space transformation.
   QPointF point = s->car_space_transform.map(QPointF{KEp.v[0] / KEp.v[2], KEp.v[1] / KEp.v[2]});
+  
+  // Check if the point is within the clipped view region after being transformed.
   if (clip_region.contains(point)) {
+    // If it is within the region, assign it to out.
     *out = point;
+    // Return true indicating the projection was successful.
     return true;
   }
+  // Return false if the point is outside the view region after transformation.
   return false;
 }
 
+// This function finds the index of the path's length at a certain vertical height (`path_height`).
+// `line` contains the path's x and z coordinates over time, where x is the path's length.
 int get_path_length_idx(const cereal::XYZTData::Reader &line, const float path_height) {
+  // Get the path's length array.
   const auto line_x = line.getX();
+  // Initialize the index to 0.
   int max_idx = 0;
+  // Iterate through the path's length array until the specified path height is reached or exceeded.
   for (int i = 1; i < line_x.size() && line_x[i] <= path_height; ++i) {
+    // Update the index to the current position.
     max_idx = i;
   }
+  // Return the index where the path's length is closest to the path height without going over.
   return max_idx;
 }
 
+
+// This function updates the UIState with the positions of the lead vehicles detected by the radar.
 void update_leads(UIState *s, const cereal::RadarState::Reader &radar_state, const cereal::XYZTData::Reader &line) {
+  
+  // Iterate over the two possible leads (0 or 1)
   for (int i = 0; i < 2; ++i) {
+    // Get the lead data from the radar state for lead one or two based on the loop index
     auto lead_data = (i == 0) ? radar_state.getLeadOne() : radar_state.getLeadTwo();
+    
+    // Check if the lead data is valid
     if (lead_data.getStatus()) {
+      // Get the vertical (z) position for the lead by interpolating along the model's predicted path.
+      // 'get_path_length_idx' returns the index where the model's path length equals the lead's distance.
       float z = line.getZ()[get_path_length_idx(line, lead_data.getDRel())];
+      
+      // Convert the relative coordinates of the lead vehicle into screen coordinates for drawing.
+      // 'calib_frame_to_full_frame' is a utility function that takes calibration into account
+      // and transforms the coordinates into the full frame of the UI. The z-value is adjusted by
+      // the assumed height of the vehicle above the ground (1.22 meters).
       calib_frame_to_full_frame(s, lead_data.getDRel(), -lead_data.getYRel(), z + 1.22, &s->scene.lead_vertices[i]);
     }
   }
 }
+
 
 void update_line_data(const UIState *s, const cereal::XYZTData::Reader &line,
                       float y_off, float z_off, QPolygonF *pvd, int max_idx, bool allow_invert=true) {

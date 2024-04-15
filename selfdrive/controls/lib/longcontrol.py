@@ -90,7 +90,8 @@ class LongControl:
       a_target = 0.0
 
     self.pid.neg_limit = accel_limits[0]
-    self.pid.pos_limit = accel_limits[1]
+    MAX_ACCEL_LIMIT = 0.4  # Maximum acceleration limit in m/s²
+    self.pid.pos_limit = min(accel_limits[1], MAX_ACCEL_LIMIT)  # MAX_ACCEL_LIMIT is your desired maximum acceleration
 
     output_accel = self.last_output_accel
     self.long_control_state = long_control_state_trans(self.CP, active, self.long_control_state, CS.vEgo,
@@ -126,6 +127,7 @@ class LongControl:
       output_accel = self.pid.update(error_deadzone, speed=CS.vEgo,
                                      feedforward=a_target,
                                      freeze_integrator=freeze_integrator)
+      output_accel = min(output_accel, MAX_ACCEL_LIMIT)
 
     self.last_output_accel = clip(output_accel, accel_limits[0], accel_limits[1])
 

@@ -89,29 +89,44 @@ void update_leads(UIState *s, const cereal::RadarState::Reader &radar_state, con
   }
 }
 
-
+// This function updates the vertices data for lines (e.g., lane lines, road edges) to be drawn on the UI
 void update_line_data(const UIState *s, const cereal::XYZTData::Reader &line,
                       float y_off, float z_off, QPolygonF *pvd, int max_idx, bool allow_invert=true) {
+  // Extract X, Y, Z coordinates from the line data
   const auto line_x = line.getX(), line_y = line.getY(), line_z = line.getZ();
+  // Prepare containers to hold points for the left and right sides of the line
   QPolygonF left_points, right_points;
+  // Reserve space to improve performance and prevent reallocations
   left_points.reserve(max_idx + 1);
   right_points.reserve(max_idx + 1);
 
+  // Iterate over each point in the line data up to max_idx
   for (int i = 0; i <= max_idx; i++) {
     // highly negative x positions  are drawn above the frame and cause flickering, clip to zy plane of camera
+    // Skip points with highly negative X coordinates as they can cause visual artifacts in the UI
     if (line_x[i] < 0) continue;
+    // Initialize points that will represent each side of the line
     QPointF left, right;
+    // Convert the points from calibration frame to full frame for the left side of the line
     bool l = calib_frame_to_full_frame(s, line_x[i], line_y[i] - y_off, line_z[i] + z_off, &left);
+    // Convert the points from calibration frame to full frame for the right side of the line
     bool r = calib_frame_to_full_frame(s, line_x[i], line_y[i] + y_off, line_z[i] + z_off, &right);
+    // Only add points if both left and right conversions are successful
     if (l && r) {
       // For wider lines the drawn polygon will "invert" when going over a hill and cause artifacts
+      // Prevent adding points that would cause the line to "invert" when the polygon is drawn
+      // This is important for visual consistency, particularly when lines are wide
       if (!allow_invert && left_points.size() && left.y() > left_points.back().y()) {
         continue;
       }
+      // Add the calculated left point to the left_points polygon
       left_points.push_back(left);
+      // Add the calculated right point to the front of the right_points polygon
+      // This is necessary because we want to create a closed shape later
       right_points.push_front(right);
     }
   }
+  // Combine the left and right points to create a closed shape and assign it to the passed polygon pointer
   *pvd = left_points + right_points;
 }
 

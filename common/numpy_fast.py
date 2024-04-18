@@ -29,6 +29,32 @@ def interp(x, xp, fp):
   # If 'x' is iterable, apply interpolation to each element and return a list.
   # If 'x' is a single value, just interpolate it.
   return [get_interp(v) for v in x] if hasattr(x, '__iter__') else get_interp(x)
+'''
+example:
+
+x = 2.5
+xp = [1, 2, 3]
+fp = [3, 6, 9]
+interpolated_value = interp(x, xp, fp)
+print(interpolated_value)  # Output should be 7.5, since it's halfway between 6 and 9
+
+x = [1.5, 2.5, 3.5]
+xp = [1, 2, 3, 4]
+fp = [3, 6, 9, 12]
+interpolated_values = interp(x, xp, fp)
+print(interpolated_values)  # Output should be [4.5, 7.5, 10.5]
+
+x = 0.5  # Value is less than the smallest xp
+xp = [1, 2, 3]
+fp = [3, 6, 9]
+interpolated_value = interp(x, xp, fp)
+print(interpolated_value)  # Output should be 3
+
+x = 4  # Value is greater than the largest xp
+interpolated_value = interp(x, xp, fp)
+print(interpolated_value)  # Output should be 9
+#endif
+'''
 
 def mean(x):
   # Calculate the arithmetic mean (average) of a list 'x'.

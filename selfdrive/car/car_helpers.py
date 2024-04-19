@@ -46,24 +46,38 @@ def get_one_can(logcan):
 
 
 def load_interfaces(brand_names):
+  # Initialize an empty dictionary to hold the mapping from car models to their interfaces
   ret = {}
+  # Loop through each brand name provided in the brand_names dictionary
   for brand_name in brand_names:
+    # Construct the module path string for the current brand name
     path = f'openpilot.selfdrive.car.{brand_name}'
+    # Dynamically import the CarInterface class from the brand's interface module
     CarInterface = __import__(path + '.interface', fromlist=['CarInterface']).CarInterface
 
+    # Check if the carstate.py file exists for the current brand in the file system
     if os.path.exists(BASEDIR + '/' + path.replace('.', '/') + '/carstate.py'):
+      # If it exists, dynamically import the CarState class from the carstate module
       CarState = __import__(path + '.carstate', fromlist=['CarState']).CarState
     else:
+      # If the carstate.py file does not exist, set CarState to None
       CarState = None
 
+    # Check if the carcontroller.py file exists for the current brand in the file system
     if os.path.exists(BASEDIR + '/' + path.replace('.', '/') + '/carcontroller.py'):
+      # If it exists, dynamically import the CarController class from the carcontroller module
       CarController = __import__(path + '.carcontroller', fromlist=['CarController']).CarController
     else:
+      # If the carcontroller.py file does not exist, set CarController to None
       CarController = None
 
+    # For each model name supported by the current brand
     for model_name in brand_names[brand_name]:
+      # Assign a tuple containing the CarInterface, CarController, and CarState to the return dictionary
       ret[model_name] = (CarInterface, CarController, CarState)
+  # Return the dictionary mapping model names to their respective classes
   return ret
+
 
 
 def _get_interface_names() -> Dict[str, List[str]]:

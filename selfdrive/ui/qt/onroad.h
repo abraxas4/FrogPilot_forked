@@ -336,7 +336,7 @@ protected:
   // Drawing functions for various UI components related to driving visualization
   void drawLaneLines(QPainter &painter, const UIState *s); // Draws lane lines on the UI based on the current state.
   void drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd); // Draws the lead vehicle information, including distance and speed.
-  void drawBoundingBox(QPainter &painter, float x, float y, float distance);
+  void paintAdjacentLanesAndBlindSpots(QPainter &painter);
   // Function to draw the entire heads-up display
   void drawHud(QPainter &p);
   // Function to draw the current speed and unit

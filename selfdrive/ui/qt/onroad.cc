@@ -686,7 +686,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // Draw the car state values
-  drawCarStateOverlay(p);
+  //drawCarStateOverlay(p);
 
   p.restore();
 
@@ -1144,20 +1144,32 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   // Paint path edges
   QLinearGradient pe(0, height(), 0, 0);
   if (alwaysOnLateralActive) {
+    // An opaque teal color at the start of the gradient
     pe.setColorAt(0.0, QColor::fromHslF(178 / 360., 0.90, 0.38, 1.0));
+    // A semi-transparent teal color in the middle of the gradient
     pe.setColorAt(0.5, QColor::fromHslF(178 / 360., 0.90, 0.38, 0.5));
+    // A very transparent teal color at the end of the gradient
     pe.setColorAt(1.0, QColor::fromHslF(178 / 360., 0.90, 0.38, 0.1));
   } else if (conditionalStatus == 1 || conditionalStatus == 3) {
+    // An opaque yellow color at the start of the gradient
     pe.setColorAt(0.0, QColor::fromHslF(58 / 360., 1.00, 0.50, 1.0));
+    // A semi-transparent yellow color in the middle of the gradient
     pe.setColorAt(0.5, QColor::fromHslF(58 / 360., 1.00, 0.50, 0.5));
+    // A very transparent yellow color at the end of the gradient
     pe.setColorAt(1.0, QColor::fromHslF(58 / 360., 1.00, 0.50, 0.1));
   } else if (experimentalMode) {
+    // An opaque orange color at the start of the gradient
     pe.setColorAt(0.0, QColor::fromHslF(25 / 360., 0.71, 0.50, 1.0));
+    // A semi-transparent orange color in the middle of the gradient
     pe.setColorAt(0.5, QColor::fromHslF(25 / 360., 0.71, 0.50, 0.5));
+    // A very transparent orange color at the end of the gradient
     pe.setColorAt(1.0, QColor::fromHslF(25 / 360., 0.71, 0.50, 0.1));
   } else if (scene.navigate_on_openpilot) {
+    // An opaque light blue color at the start of the gradient
     pe.setColorAt(0.0, QColor::fromHslF(205 / 360., 0.85, 0.56, 1.0));
+    // A semi-transparent light blue color in the middle of the gradient
     pe.setColorAt(0.5, QColor::fromHslF(205 / 360., 0.85, 0.56, 0.5));
+    // A very transparent light blue color at the end of the gradient
     pe.setColorAt(1.0, QColor::fromHslF(205 / 360., 0.85, 0.56, 0.1));
   } else if (customColors != 0) {
     const auto &colorMap = std::get<3>(themeConfiguration[customColors]);
@@ -1166,8 +1178,11 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
       pe.setColorAt(position, darkerColor);
     }
   } else {
+    // A green color with medium lightness and high saturation at the start of the gradient
     pe.setColorAt(0.0, QColor::fromHslF(148 / 360., 0.94, 0.51, 1.0));
+    // A green color with more lightness and full saturation in the middle of the gradient
     pe.setColorAt(0.5, QColor::fromHslF(112 / 360., 1.00, 0.68, 0.5));
+    // A green color with more lightness and full saturation at the end of the gradient, but very transparent
     pe.setColorAt(1.0, QColor::fromHslF(112 / 360., 1.00, 0.68, 0.1));
   }
 
@@ -1178,8 +1193,11 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   if (scene.blind_spot_path) {
     QLinearGradient bs(0, height(), 0, 0);
     if (blindSpotLeft || blindSpotRight) {
+      // A semi-transparent red color at the start of the gradient (blindspot detection area)
       bs.setColorAt(0.0, QColor::fromHslF(0 / 360., 0.75, 0.50, 0.6));
+      // A more transparent red color in the middle of the gradient (blindspot detection area)
       bs.setColorAt(0.5, QColor::fromHslF(0 / 360., 0.75, 0.50, 0.4));
+      // A very transparent red color at the end of the gradient (blindspot detection area)
       bs.setColorAt(1.0, QColor::fromHslF(0 / 360., 0.75, 0.50, 0.2));
     }
 
@@ -1192,53 +1210,85 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
     }
   }
 
-  // Paint adjacent lane paths
+  // Extracted function call to paint adjacent lanes and blind spots.
   if (scene.adjacent_path && (laneWidthLeft != 0 || laneWidthRight != 0)) {
-    // Set up the units
-    double distanceValue = is_metric ? 1.0 : METER_TO_FOOT;
-    QString unit_d = is_metric ? " meters" : " feet";
-
-    // Declare the lane width thresholds
-    constexpr float minLaneWidth = 2.0f;
-    constexpr float maxLaneWidth = 4.0f;
-
-    // Set gradient colors based on laneWidth and blindspot
-    auto setGradientColors = [](QLinearGradient &gradient, float laneWidth, bool blindspot) {
-      // Make the path red for smaller paths or if there's a car in the blindspot and green for larger paths
-      double hue = (laneWidth < minLaneWidth || laneWidth > maxLaneWidth || blindspot)
-                         ? 0.0 : 120.0 * (laneWidth - minLaneWidth) / (maxLaneWidth - minLaneWidth);
-      double hue_ratio = hue / 360.0;
-      gradient.setColorAt(0.0, QColor::fromHslF(hue_ratio, 0.75, 0.50, 0.6));
-      gradient.setColorAt(0.5, QColor::fromHslF(hue_ratio, 0.75, 0.50, 0.4));
-      gradient.setColorAt(1.0, QColor::fromHslF(hue_ratio, 0.75, 0.50, 0.2));
-    };
-
-    // Paint the lanes
-    auto paintLane = [&](QPainter &painter, const QPolygonF &lane, float laneWidth, bool blindspot) {
-      QLinearGradient gradient(0, height(), 0, 0);
-      setGradientColors(gradient, laneWidth, blindspot);
-
-      painter.setFont(InterFont(30, QFont::DemiBold));
-      painter.setBrush(gradient);
-      painter.setPen(Qt::transparent);
-      painter.drawPolygon(lane);
-      painter.setPen(Qt::white);
-
-      QRectF boundingRect = lane.boundingRect();
-      if (scene.adjacent_path_metrics) {
-        painter.drawText(boundingRect.center(),
-                         blindspot ? "Vehicle in blind spot" :
-                         QString("%1%2").arg(laneWidth * distanceValue, 0, 'f', 2).arg(unit_d));
-      }
-      painter.setPen(Qt::NoPen);
-    };
-
-    paintLane(painter, scene.track_adjacent_vertices[4], laneWidthLeft, blindSpotLeft);
-    paintLane(painter, scene.track_adjacent_vertices[5], laneWidthRight, blindSpotRight);
+    this->paintAdjacentLanesAndBlindSpots(painter);
   }
 
   painter.restore();
 }
+void AnnotatedCameraWidget::paintAdjacentLanesAndBlindSpots(QPainter &painter) {
+  if ((laneWidthLeft != 0 || laneWidthRight != 0)) {
+    double distanceValue = is_metric ? 1.0 : METER_TO_FOOT;
+    QString unit_d = is_metric ? " meters" : " feet";
+
+    const float minLaneWidth = 2.0f;
+    const float maxLaneWidth = 4.0f;
+
+    auto setGradientColors = [minLaneWidth, maxLaneWidth](QLinearGradient &gradient, float laneWidth, bool blindspot) {
+      double hue = (laneWidth < minLaneWidth || laneWidth > maxLaneWidth || blindspot) ? 0.0 : 120.0 * (laneWidth - minLaneWidth) / (maxLaneWidth - minLaneWidth);
+      hue /= 360.0; // Normalize hue value
+      gradient.setColorAt(0.0, QColor::fromHslF(hue, 0.75, 0.50, 0.6));
+      gradient.setColorAt(0.5, QColor::fromHslF(hue, 0.75, 0.50, 0.4));
+      gradient.setColorAt(1.0, QColor::fromHslF(hue, 0.75, 0.50, 0.2));
+    };
+    auto paintLane = [&](const QPolygonF &lane, float laneWidth, bool blindspot) {
+      QLinearGradient gradient(0, height(), 0, 0);
+      setGradientColors(gradient, laneWidth, blindspot);
+      
+      QFont font = InterFont(30, QFont::DemiBold);
+      font.setPixelSize(48); // Adjusted font size
+      painter.setFont(font);
+
+      painter.setBrush(gradient);
+      painter.setPen(Qt::transparent);
+      painter.drawPolygon(lane);
+      
+      QRectF boundingRect = lane.boundingRect();
+      QPointF textPos = boundingRect.center(); // This is the center of the rectangle
+      
+      painter.setPen(Qt::white);
+
+      auto x_to_write = textPos.x();
+      if(textPos.x() < this->width()/2) x_to_write += 100;
+      else x_to_write -= 200;
+      if (blindspot) {
+        // Draw the "VEHICLE IN" and "BLIND SPOT" texts centered above and below the middle y position
+        
+        float textYOffset = font.pixelSize() * 1.1;
+        painter.drawText(x_to_write, textPos.y() - textYOffset/2, "VEHICLE IN");
+        painter.drawText(x_to_write, textPos.y() + textYOffset/2, "BLIND SPOT");
+      } 
+      else {
+        // Initialize minY to the maximum possible float value
+        float minY = std::numeric_limits<float>::max();
+
+        // Iterate through the polygon points to find the minimum y coordinate
+        for (const QPointF &point : lane) {
+          minY = std::min(minY, static_cast<float>(point.y())); // Ensure both are floats
+        }
+        float middleY = minY + ((this->height() - minY) / 3);
+        QString laneWidthText = QString("%1%2").arg(laneWidth * distanceValue, 0, 'f', 2).arg(unit_d);
+        font.setPixelSize(35); // Adjusted font size
+        painter.setFont(font);
+        // Adjust the text to be drawn in the vertical middle of the polygon
+        painter.drawText(x_to_write, middleY, laneWidthText);
+      }
+      
+      painter.setPen(Qt::NoPen);
+    };
+
+    if (scene.adjacent_path) {
+      paintLane(scene.track_adjacent_vertices[4], laneWidthLeft, blindSpotLeft);
+      paintLane(scene.track_adjacent_vertices[5], laneWidthRight, blindSpotRight);
+    }
+
+  }
+}
+
+
+
+
 
 // This function is used to draw the lead vehicle indicator on the QPainter canvas
 void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd) {
@@ -1268,7 +1318,6 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
     // Clamp the alpha value to a maximum of 255 to ensure it stays within valid color value range
     fillAlpha = (int)(fmin(fillAlpha, 255));
   }
-
   // Calculate the size of the chevron based on relative distance, clamping to a minimum and maximum size
   float sz = std::clamp((25 * 30) / (d_rel / 3 + 30), 15.0f, 30.0f) * 2.35;
   // Clamp the x position of the chevron to stay within the widget's width boundaries
@@ -1286,21 +1335,49 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
   painter.setBrush(QColor(218, 202, 37, 255));
   // Draw the glow effect as a polygon behind the chevron
   painter.drawPolygon(glow, std::size(glow));
-
-  // chevron
-  // Define the points for the chevron shape
   QPointF chevron[] = {{x + (sz * 1.25), y + sz}, {x, y}, {x - (sz * 1.25), y + sz}};
-  // Set the brush color for the chevron based on custom theme settings
-  if (customColors != 0) {
-    // Use the color from the theme configuration if custom colors are enabled
-    painter.setBrush(std::get<3>(themeConfiguration[customColors]).begin()->second);
-  } else {
-    // Use a standard red color with calculated transparency if custom colors are not enabled
-    painter.setBrush(redColor(fillAlpha));
-  }
-  // Draw the chevron shape on the canvas
-  painter.drawPolygon(chevron, std::size(chevron));
+  // Draw the chevron
+  #if 1
+  {
+    QColor chevronColor;
+    if (customColors != 0) {
+      // Use the color from the theme configuration if custom colors are enabled
+      // The returned type from themeConfiguration should be QColor, 
+      // but if it's not, you need to ensure you're getting a QColor.
+      // Assuming that std::get<3>(themeConfiguration[customColors]) returns a map or similar container
+      // and its `second` is QColor. If not, you'll need to adjust this.
+      chevronColor = std::get<3>(themeConfiguration[customColors]).begin()->second.color();;
+    } else {
+      // Calculate the alpha value only if custom colors are not enabled
+      fillAlpha = std::min(255.0f, static_cast<float>(255 * (1.0 - (d_rel / leadBuff))));
+      if (v_rel < 0) {
+        // Increase the alpha based on the speed buffer when the lead car is approaching
+        fillAlpha += std::min(255.0f, static_cast<float>(255 * (-1 * (v_rel / speedBuff))));
+      }
+      // Set to red color if the lead vehicle is approaching, otherwise use a standard color
+      chevronColor = v_rel < 0 ? QColor(255, 0, 0, fillAlpha) : QColor(218, 202, 37, fillAlpha);
+    }
 
+    // Use this color when setting the brush for the chevron
+    painter.setBrush(chevronColor);
+
+    // Draw the chevron shape on the canvas
+    painter.drawPolygon(chevron, std::size(chevron));
+  }
+  #else
+  {
+    // Set the brush color for the chevron based on custom theme settings
+    if (customColors != 0) {
+      // Use the color from the theme configuration if custom colors are enabled
+      painter.setBrush(std::get<3>(themeConfiguration[customColors]).begin()->second);
+    } else {
+      // Use a standard red color with calculated transparency if custom colors are not enabled
+      painter.setBrush(redColor(fillAlpha));
+    }
+    // Draw the chevron shape on the canvas
+    painter.drawPolygon(chevron, std::size(chevron));
+  }
+  #endif
   // Add lead info
   // Check if lead vehicle info should be added to the indicator
   if (leadInfo) {
@@ -1314,11 +1391,13 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
     painter.setFont(InterFont(35, QFont::Bold));
 
     // Compose the lead vehicle info text with distance and speed
-    QString text = QString("%1 %2 | %3 %4")
+    QString text = QString("%1 %2, %3 %4, %5 %6")
                            .arg(qRound(d_rel * distanceConversion))
                            .arg(leadDistanceUnit)
                            .arg(qRound(lead_speed * speedConversion))
-                           .arg(leadSpeedUnit);
+                           .arg(leadSpeedUnit)
+                           .arg(qRound(MS_TO_KPH*lead_data.getVRel()))
+                           .arg(speedUnit);
 
     // Calculate the text starting position
     // Calculate the metrics for the text to centralize it below the chevron
@@ -1328,12 +1407,9 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
     // Draw the lead vehicle info text below the chevron
     painter.drawText(middle_x - textWidth / 2, chevron[0].y() + metrics.height() + 5, text);
   }
-
   // Restore the painter state to what it was before drawing the lead vehicle indicator
   painter.restore();
 }
-
-
 void AnnotatedCameraWidget::paintGL() {
 }
 // The paintEvent function is called by the Qt framework to update the widget's appearance
@@ -1597,7 +1673,7 @@ void AnnotatedCameraWidget::updateFrogPilotWidgets(QPainter &p) {
     pedal_icons->updateState();
   }
 
-  bool enableCompass = compass && !hideBottomIcons;
+  bool enableCompass = true;//compass && !hideBottomIcons;
   compass_img->setVisible(enableCompass);
   if (enableCompass) {
     compass_img->updateState(scene.bearing_deg);
@@ -1620,7 +1696,7 @@ void AnnotatedCameraWidget::updateFrogPilotWidgets(QPainter &p) {
   experimental_btn->updateState(leadInfo);
 
   if (map_settings_btn->isEnabled()) {
-    map_settings_btn->setVisible(!hideBottomIcons && compass);
+    map_settings_btn->setVisible(enableCompass);//!hideBottomIcons && compass);
     //main_layout->setAlignment(map_settings_btn, (rightHandDM ? Qt::AlignLeft : Qt::AlignRight) | (compass ? Qt::AlignTop : Qt::AlignBottom));
     updateWidgetAlignment();
   }

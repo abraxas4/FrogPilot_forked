@@ -347,8 +347,7 @@ protected:
   void drawHeaderGradient(QPainter &p);
   void drawCarStateOverlay(QPainter &p);
   void updateWidgetAlignment(); // Method to update widget alignment dynamically
-
-
+  void drawPolygonCoordinates(QPainter &painter, const QPolygonF &polygon, QColor textColor);
   double prev_draw_t = 0; // Holds the previous draw time; useful for calculating frame rates or animation intervals.
   FirstOrderFilter fps_filter; // A filter for smoothing out the frame-per-second calculations.
 };

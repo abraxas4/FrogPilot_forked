@@ -1053,6 +1053,44 @@ void AnnotatedCameraWidget::updateFrameMat() {
       .scale(zoom, zoom)
       .translate(-intrinsic_matrix.v[2], -intrinsic_matrix.v[5]);
 }
+void AnnotatedCameraWidget::drawPolygonCoordinates(QPainter &painter, const QPolygonF &polygon, QColor textColor) {
+  // Save the current painter state
+  painter.save();
+
+  // Set the pen color for drawing text using the provided color
+  painter.setPen(textColor);
+
+  // Set the font for the text
+  QFont font = painter.font();
+  font.setPointSize(12); // Example size, adjust as needed
+  painter.setFont(font);
+
+  // Initialize the last point
+  QPointF lastPoint(-1000, -1000); // Start with an invalid point far away
+
+  // Iterate over each point in the polygon
+  for (int i = 0; i < polygon.size(); ++i) {
+    // Get the current point
+    QPointF point = polygon[i];
+
+    // Check the distance from the last printed point
+    if (QLineF(point, lastPoint).length() > 20) {
+      // If the point is sufficiently far, prepare the text to display the coordinates rounded to the nearest integer
+      QString text = QString("x: %1, y: %2").arg(static_cast<int>(std::round(point.x())))
+                                             .arg(static_cast<int>(std::round(point.y())));
+
+      // Draw the text on the screen at the point's coordinates
+      painter.drawText(point, text);
+
+      // Update the last point
+      lastPoint = point;
+    }
+  }
+
+  // Restore the painter state
+  painter.restore();
+}
+
 
 void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   painter.save();
@@ -1067,6 +1105,7 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
       painter.setBrush(QColor::fromRgbF(1.0, 1.0, 1.0, std::clamp<float>(scene.lane_line_probs[i], 0.0, 0.7)));
     }
     painter.drawPolygon(scene.lane_line_vertices[i]);
+    drawPolygonCoordinates(painter, scene.lane_line_vertices[i], Qt::white);
   }
 
   // road edges
@@ -1077,6 +1116,7 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
       painter.setBrush(QColor::fromRgbF(1.0, 0, 0, std::clamp<float>(1.0 - scene.road_edge_stds[i], 0.0, 1.0)));
     }
     painter.drawPolygon(scene.road_edge_vertices[i]);
+    drawPolygonCoordinates(painter, scene.road_edge_vertices[i], Qt::blue);
   }
 
   // paint path
@@ -1135,6 +1175,7 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
 
   painter.setBrush(bg);
   painter.drawPolygon(scene.track_vertices);
+  drawPolygonCoordinates(painter, scene.track_vertices, Qt::cyan);
 
   // Create new path with track vertices and track edge vertices
   QPainterPath path;
@@ -1204,9 +1245,11 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
     painter.setBrush(bs);
     if (blindSpotLeft) {
       painter.drawPolygon(scene.track_adjacent_vertices[4]);
+      drawPolygonCoordinates(painter, scene.track_adjacent_vertices[4], Qt::magenta);
     }
     if (blindSpotRight) {
       painter.drawPolygon(scene.track_adjacent_vertices[5]);
+      drawPolygonCoordinates(painter, scene.track_adjacent_vertices[5], Qt::darkGray);
     }
   }
 
@@ -1243,6 +1286,7 @@ void AnnotatedCameraWidget::paintAdjacentLanesAndBlindSpots(QPainter &painter) {
       painter.setBrush(gradient);
       painter.setPen(Qt::transparent);
       painter.drawPolygon(lane);
+      drawPolygonCoordinates(painter, lane, Qt::darkYellow);
       
       QRectF boundingRect = lane.boundingRect();
       QPointF textPos = boundingRect.center(); // This is the center of the rectangle
